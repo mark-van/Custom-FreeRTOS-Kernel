@@ -191,6 +191,18 @@ typedef enum
     #endif /* INCLUDE_vTaskSuspend */
 } eSleepModeStatus;
 
+/* Used with EDF shcduling to determine task priority */
+typedef struct xEDF
+{
+    TickType_T   periodStartTime;   // absolute time
+    TickType_T   deadline;          // relative time
+    TickType_T   period;            // relative time
+    TaskHandle_t task;              // task identifier
+}; EDFStatus_t;
+
+EDFStatus_t xEDFTaskList[configMAX_TASK_COUNT];
+
+
 /**
  * Defines the priority used by the idle task.  This must not be modified.
  *
@@ -400,6 +412,26 @@ typedef enum
                                        TaskHandle_t * const pxCreatedTask ) PRIVILEGED_FUNCTION;
 #endif
 
+/** Task Create when using EDF 
+* 
+*   @param deadline Given a start time of zero, deadline is the time in miliseconds until the task is due
+*
+*   @param period   Period at which task should repeat in miliseconds
+*/
+
+#if ( configSUPPORT_DYNAMIC_ALLOCATION == 1 && configUSE_EDF == 1)
+    BaseType_t xTaskCreateEDF( TaskFunction_t pxTaskCode,
+                            const char * const pcName,
+                            const configSTACK_DEPTH_TYPE uxStackDepth,
+                            void * const pvParameters,
+                            UBaseType_t uxPriority,
+                            TaskHandle_t * const pxCreatedTask,
+                            uint64 deadline,
+					        uint64 period ) PRIVILEGED_FUNCTION;
+#endif
+
+
+
 /**
  * task. h
  * @code{c}
@@ -528,6 +560,27 @@ typedef enum
                                                StaticTask_t * const pxTaskBuffer,
                                                UBaseType_t uxCoreAffinityMask ) PRIVILEGED_FUNCTION;
 #endif
+
+/** Static Task Create when using EDF 
+* 
+*   @param deadline Given a start time of zero, deadline is the time in miliseconds until the task is due
+*
+*   @param period   Period at which task should repeat in miliseconds
+*/
+
+#if ( configSUPPORT_DYNAMIC_ALLOCATION == 1 && configUSE_EDF == 1)
+    TaskHandle_t xTaskCreateStaticEDF(  TaskFunction_t pxTaskCode,
+                                        const char * const pcName,
+                                        const configSTACK_DEPTH_TYPE uxStackDepth,
+                                        void * const pvParameters,
+                                        UBaseType_t uxPriority,
+                                        StackType_t * const puxStackBuffer,
+                                        StaticTask_t * const pxTaskBuffer,
+                                        uint64 deadline,
+                                        uint64 period ) PRIVILEGED_FUNCTION;
+#endif /* configSUPPORT_STATIC_ALLOCATION */
+
+
 
 /**
  * task. h
@@ -1189,6 +1242,15 @@ UBaseType_t uxTaskBasePriorityGetFromISR( const TaskHandle_t xTask ) PRIVILEGED_
  */
 void vTaskPrioritySet( TaskHandle_t xTask,
                        UBaseType_t uxNewPriority ) PRIVILEGED_FUNCTION;
+
+
+
+/**
+*   Update task priorities according to EDF algorithm 
+*/
+void vTaskUpdatePriorityEDF (void) PRIVILEGED_FUNCTION;
+
+
 
 /**
  * task. h
