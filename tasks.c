@@ -463,6 +463,12 @@ PRIVILEGED_DATA static List_t * volatile pxDelayedTaskList;              /**< Po
 PRIVILEGED_DATA static List_t * volatile pxOverflowDelayedTaskList;      /**< Points to the delayed task list currently being used to hold tasks that have overflowed the current tick count. */
 PRIVILEGED_DATA static List_t xPendingReadyList;                         /**< Tasks that have been readied while the scheduler was suspended.  They will be moved to the ready list when the scheduler is resumed. */
 
+#if ( configUSE_EDF == 1 )
+    PRIVILEGED_DATA static EDFStatus_t volatile xEDFTaskList[configMAX_TASK_COUNT]; // TODO: PRIVILEGED_DATA? volatile?
+    PRIVILEGED_DATA static uint16_t volatile maxEDFIndex  = 0;
+    PRIVILEGED_DATA static uint16_t volatile minEDFIndex  = 0;
+#endif
+
 #if ( INCLUDE_vTaskDelete == 1 )
 
     PRIVILEGED_DATA static List_t xTasksWaitingTermination; /**< Tasks that have been deleted - but their memory not yet freed. */
@@ -1344,7 +1350,48 @@ static void prvAddNewTaskToReadyList( TCB_t * pxNewTCB ) PRIVILEGED_FUNCTION;
         return xReturn;
     }
 /*-----------------------------------------------------------*/
+    #if ( configUSE_EDF == 1)
+        TaskHandle_t xTaskCreateStaticEDF(  TaskFunction_t pxTaskCode,
+                                        const char * const pcName,
+                                        const configSTACK_DEPTH_TYPE uxStackDepth,
+                                        void * const pvParameters,
+                                        StackType_t * const puxStackBuffer,
+                                        StaticTask_t * const pxTaskBuffer,
+                                        uint64 deadline,
+                                        uint64 period )
+        {            
+            TaskHandle_t pxCreatedTask  = xTaskCreateStatic(pxTaskCode,
+                                                            pcName,
+                                                            uxStackDepth,
+                                                            pvParameters,
+                                                            0,
+                                                            puxStackBuffer,
+                                                            pxTaskBuffer);
+            
+            xEDFTaskList[minEDFIndex] = {
+                                        .periodStartTime = 0,
+                                        .deadline = pdMS_TO_TICKS(deadline),
+                                        .period = pdMS_TO_TICKS(period),
+                                        .task = *pxCreatedTask,
+                                        };
+            
+            // If scheduler is already running, set start time to current tick
+            if (xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED)
+            {
+                xEDFTaskList[minEDFIndex].periodStartTime = xTaskGetTickCount();
+            }
 
+            // update minEDFIndex and maxEDFIndex
+            minEDFIndex++;
+            while ((xEDFTaskList[minEDFIndex].task != NULL) && (minEDFIndex < configMAX_NUM_TASKS - 1)) {minEDFIndex++;}
+            
+            if (minEDFIndex > maxEDFIndex + 1)
+            {
+                maxEDFIndex = minEDFIndex - 1;
+            }
+        }
+    #endif
+/*-----------------------------------------------------------*/
     #if ( ( configNUMBER_OF_CORES > 1 ) && ( configUSE_CORE_AFFINITY == 1 ) )
         TaskHandle_t xTaskCreateStaticAffinitySet( TaskFunction_t pxTaskCode,
                                                    const char * const pcName,
@@ -1752,6 +1799,43 @@ static void prvAddNewTaskToReadyList( TCB_t * pxNewTCB ) PRIVILEGED_FUNCTION;
 
         return xReturn;
     }
+/*-----------------------------------------------------------*/
+    #if ( configSUPPORT_DYNAMIC_ALLOCATION == 1 && configUSE_EDF == 1)
+        BaseType_t xTaskCreateEDF(  TaskFunction_t pxTaskCode,
+                                    const char * const pcName,
+                                    const configSTACK_DEPTH_TYPE uxStackDepth,
+                                    void * const pvParameters,
+                                    TaskHandle_t * const pxCreatedTask,
+                                    uint64 deadline,
+                                    uint64 period )
+        {            
+            xTaskCreate(pxTaskCode, pcName, uxStackDepth, pvParameters, 0, pxCreatedTask );
+            
+            xEDFTaskList[minEDFIndex] = {
+                                        .periodStartTime = 0,
+                                        .deadline = pdMS_TO_TICKS(deadline),
+                                        .period = pdMS_TO_TICKS(period),
+                                        .task = *pxCreatedTask,
+                                        };
+            
+            // If scheduler is already running, set start time to current tick
+            if (xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED)
+            {
+                xEDFTaskList[minEDFIndex].periodStartTime = xTaskGetTickCount();
+            }
+
+            // update minEDFIndex and maxEDFIndex
+            minEDFIndex++;
+            while ((xEDFTaskList[minEDFIndex].task != NULL) && (minEDFIndex < configMAX_NUM_TASKS - 1)) {minEDFIndex++;}
+            
+            if (minEDFIndex > maxEDFIndex + 1)
+            {
+                maxEDFIndex = minEDFIndex - 1;
+            }
+        }
+
+    #endif
+
 /*-----------------------------------------------------------*/
 
     #if ( ( configNUMBER_OF_CORES > 1 ) && ( configUSE_CORE_AFFINITY == 1 ) )
@@ -2200,6 +2284,26 @@ static void prvInitialiseNewTask( TaskFunction_t pxTaskCode,
 
         taskENTER_CRITICAL();
         {
+            /* Remove EDF entry for task */
+            #if ( configUSE_EDF == 1 )
+                for (int k = 0; k <= maxEDFIndex; k++)
+                {
+                    if (xEDFTaskList[k].task == xTaskToDelete)
+                    {
+                        xEDFTaskList[k].task = NULL;
+                        if (k == maxEDFIndex)
+                        {
+                            maxEDFIndex-=1;
+                        }
+                        else if (k < minEDFIndex)
+                        {
+                            minEDFIndex = k;
+                        }
+                        continue;
+                    }
+                }
+            #endif /* #if ( configUSE_EDF == 1 ) */
+
             /* If null is passed in here then it is the calling task that is
              * being deleted. */
             pxTCB = prvGetTCBFromHandle( xTaskToDelete );
@@ -2975,7 +3079,43 @@ static void prvInitialiseNewTask( TaskFunction_t pxTaskCode,
 
 #endif /* INCLUDE_vTaskPrioritySet */
 /*-----------------------------------------------------------*/
+#if ( (INCLUDE_vTaskPrioritySet == 1) && (configUSE_EDF == 1) )
+void vTaskUpdatePriorityEDF (void)
+{
+    // TODO: check is any  have reached the next start of period
 
+    // TODO: All tasks are new case
+
+    // find task with highest priority, set the rest to the same low priority
+    TickType_T shotestTimeToDeadline; //TODO: use largest possibl;e value for TickType_T types?//might need a macor for that since i changes epneding on config,,,,
+    TaskHandle_t highestPriority = NULL;
+    for (int k = 0; k < maxEDFIndex; k++)
+    {
+        if (xEDFTaskList[k].task != NULL)
+        {
+            // TODO: NEED TO CHECK if it loops AROUND (ie goes pac to zero after 16 bit)
+            xEDFTaskList[k].periodStartTime + xEDFTaskList[k].deadline;
+        }
+    }
+
+    void vTaskPrioritySet( TaskHandle_t xTask,
+                           UBaseType_t uxNewPriority )
+
+    PRIVILEGED_DATA static EDFStatus_t volatile xEDFTaskList[configMAX_TASK_COUNT]; // TODO: PRIVILEGED_DATA? volatile?
+    PRIVILEGED_DATA static uint16_t volatile maxEDFIndex  = 0;
+    PRIVILEGED_DATA static uint16_t volatile minEDFIndex  = 0;
+
+    typedef struct xEDF
+{
+    TickType_T   periodStartTime;   // absolute time
+    TickType_T   deadline;          // relative time
+    TickType_T   period;            // relative time
+    TaskHandle_t task;              // task identifier
+}; EDFStatus_t;
+
+}
+#endif /* #if ( (INCLUDE_vTaskPrioritySet == 1) && (configUSE_EDF == 1) ) */
+/*-----------------------------------------------------------*/
 #if ( ( configNUMBER_OF_CORES > 1 ) && ( configUSE_CORE_AFFINITY == 1 ) )
     void vTaskCoreAffinitySet( const TaskHandle_t xTask,
                                UBaseType_t uxCoreAffinityMask )

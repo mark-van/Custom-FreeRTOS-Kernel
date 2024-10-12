@@ -200,8 +200,6 @@ typedef struct xEDF
     TaskHandle_t task;              // task identifier
 }; EDFStatus_t;
 
-EDFStatus_t xEDFTaskList[configMAX_TASK_COUNT];
-
 
 /**
  * Defines the priority used by the idle task.  This must not be modified.
@@ -424,7 +422,6 @@ EDFStatus_t xEDFTaskList[configMAX_TASK_COUNT];
                             const char * const pcName,
                             const configSTACK_DEPTH_TYPE uxStackDepth,
                             void * const pvParameters,
-                            UBaseType_t uxPriority,
                             TaskHandle_t * const pxCreatedTask,
                             uint64 deadline,
 					        uint64 period ) PRIVILEGED_FUNCTION;
@@ -573,7 +570,6 @@ EDFStatus_t xEDFTaskList[configMAX_TASK_COUNT];
                                         const char * const pcName,
                                         const configSTACK_DEPTH_TYPE uxStackDepth,
                                         void * const pvParameters,
-                                        UBaseType_t uxPriority,
                                         StackType_t * const puxStackBuffer,
                                         StaticTask_t * const pxTaskBuffer,
                                         uint64 deadline,
