@@ -191,16 +191,6 @@ typedef enum
     #endif /* INCLUDE_vTaskSuspend */
 } eSleepModeStatus;
 
-/* Used with EDF shcduling to determine task priority */
-typedef struct xEDF
-{
-    TickType_T   periodStartTime;   // absolute time
-    TickType_T   deadline;          // relative time
-    TickType_T   period;            // relative time
-    TaskHandle_t task;              // task identifier
-}; EDFStatus_t;
-
-
 /**
  * Defines the priority used by the idle task.  This must not be modified.
  *
@@ -3826,6 +3816,13 @@ void vTaskInternalSetTimeOutState( TimeOut_t * const pxTimeOut ) PRIVILEGED_FUNC
                                           int32_t lInternalIndexOfKernelObject ) PRIVILEGED_FUNCTION;
 
 #endif /* #if ( ( portUSING_MPU_WRAPPERS == 1 ) && ( configUSE_MPU_WRAPPERS_V1 == 0 ) && ( configENABLE_ACCESS_CONTROL_LIST == 1 ) ) */
+
+
+/* Function for task to release control after completing its work for this period */
+void taskDoneEDF(void);
+
+
+
 
 /* *INDENT-OFF* */
 #ifdef __cplusplus
