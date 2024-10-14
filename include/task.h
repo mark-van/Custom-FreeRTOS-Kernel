@@ -402,7 +402,8 @@ typedef enum
 
 /** Task Create when using EDF 
 * 
-*   @param deadline Given a start time of zero, deadline is the time in miliseconds until the task is due
+*   @param deadline Given a start time of zero, deadline is the time
+*   in miliseconds until the task is due
 *
 *   @param period   Period at which task should repeat in miliseconds
 */
@@ -413,8 +414,8 @@ typedef enum
                             const configSTACK_DEPTH_TYPE uxStackDepth,
                             void * const pvParameters,
                             TaskHandle_t * const pxCreatedTask,
-                            uint64 deadline,
-					        uint64 period ) PRIVILEGED_FUNCTION;
+                            UBaseType_t deadline,
+					        UBaseType_t period ) PRIVILEGED_FUNCTION;
 #endif
 
 
@@ -550,7 +551,8 @@ typedef enum
 
 /** Static Task Create when using EDF 
 * 
-*   @param deadline Given a start time of zero, deadline is the time in miliseconds until the task is due
+*   @param deadline Given a start time of zero, deadline is the time
+*   in miliseconds until the task is due
 *
 *   @param period   Period at which task should repeat in miliseconds
 */
@@ -562,8 +564,8 @@ typedef enum
                                         void * const pvParameters,
                                         StackType_t * const puxStackBuffer,
                                         StaticTask_t * const pxTaskBuffer,
-                                        uint64 deadline,
-                                        uint64 period ) PRIVILEGED_FUNCTION;
+                                        UBaseType_t deadline,
+                                        UBaseType_t period ) PRIVILEGED_FUNCTION;
 #endif /* configSUPPORT_STATIC_ALLOCATION */
 
 
@@ -3818,9 +3820,17 @@ void vTaskInternalSetTimeOutState( TimeOut_t * const pxTimeOut ) PRIVILEGED_FUNC
 #endif /* #if ( ( portUSING_MPU_WRAPPERS == 1 ) && ( configUSE_MPU_WRAPPERS_V1 == 0 ) && ( configENABLE_ACCESS_CONTROL_LIST == 1 ) ) */
 
 
-/* Function for task to release control after completing its work for this period */
-void taskDoneEDF(void);
-
+/**
+*   Function for task to release control after completing its work for this period 
+*
+* @param pxPreviousWakeTime Pointer to a variable that holds the time at which the
+* task was last unblocked.  The variable must be initialised with the current time
+* prior to its first use.  Following this the variable is automatically updated
+* within xTaskDelayUntil ().
+*/
+#if ( (configUSE_EDF == 1) )
+    void taskDoneEDF(TickType_t * pxInitialWakeTime);
+#endif /* #if ( (configUSE_EDF == 1) ) */
 
 
 
