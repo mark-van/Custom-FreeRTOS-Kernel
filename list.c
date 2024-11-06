@@ -36,6 +36,7 @@
 
 #include "FreeRTOS.h"
 #include "list.h"
+#include "task.h"
 
 /* The MPU ports require MPU_WRAPPERS_INCLUDED_FROM_API_FILE to be
  * defined for the header files above, but not in this file, in order to
@@ -132,6 +133,14 @@ void vListInsertEnd( List_t * const pxList,
 
     ( pxList->uxNumberOfItems ) = ( UBaseType_t ) ( pxList->uxNumberOfItems + 1U );
 
+    #if ( configUSE_EDF == 1 )
+        // if a ready list is being edited, then update priorities
+        if (vTaskIsReadyList(pxList))
+        {
+            vTaskUpdatePriorityEDF();
+        }
+    #endif
+
     traceRETURN_vListInsertEnd();
 }
 /*-----------------------------------------------------------*/
@@ -209,6 +218,15 @@ void vListInsert( List_t * const pxList,
 
     ( pxList->uxNumberOfItems ) = ( UBaseType_t ) ( pxList->uxNumberOfItems + 1U );
 
+
+    #if ( configUSE_EDF == 1 )
+        // if a ready list is being edited, then update priorities
+        if (vTaskIsReadyList(pxList))
+        {
+            vTaskUpdatePriorityEDF();
+        }
+    #endif
+
     traceRETURN_vListInsert();
 }
 /*-----------------------------------------------------------*/
@@ -242,6 +260,14 @@ UBaseType_t uxListRemove( ListItem_t * const pxItemToRemove )
     ( pxList->uxNumberOfItems ) = ( UBaseType_t ) ( pxList->uxNumberOfItems - 1U );
 
     traceRETURN_uxListRemove( pxList->uxNumberOfItems );
+
+    #if ( configUSE_EDF == 1 )
+        // if a ready list is being edited, then update priorities
+        if (vTaskIsReadyList(pxList))
+        {
+            vTaskUpdatePriorityEDF();
+        }
+    #endif
 
     return pxList->uxNumberOfItems;
 }

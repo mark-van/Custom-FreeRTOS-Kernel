@@ -3829,10 +3829,17 @@ void vTaskInternalSetTimeOutState( TimeOut_t * const pxTimeOut ) PRIVILEGED_FUNC
 * within xTaskDelayUntil ().
 */
 #if ( (configUSE_EDF == 1) )
-    void taskDoneEDF(TickType_t * pxInitialWakeTime);
+    void vTaskDoneEDF(TickType_t * pxInitialWakeTime);
 #endif /* #if ( (configUSE_EDF == 1) ) */
 
 
+/*
+ *  True if list is a 'pxReadyTasksLists'
+ *
+ * @param pxList Pointer to the list being checked.
+ *
+ */
+char vTaskIsReadyList(List_t * const pxList);
 
 /* *INDENT-OFF* */
 #ifdef __cplusplus

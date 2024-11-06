@@ -515,7 +515,7 @@ PRIVILEGED_DATA static List_t xPendingReadyList;                         /**< Ta
          * @param uxNewPriority The priority to which the task will be set.
         */
         void vTaskPrioritySetISR(   TaskHandle_t xTask,
-                                    UBaseType_t uxNewPriority )
+                                    UBaseType_t uxNewPriority );
     #endif
 #endif /* ( configUSE_EDF == 1 ) */
 
@@ -3284,7 +3284,7 @@ static void prvInitialiseNewTask( TaskFunction_t pxTaskCode,
 #endif /* #if ( (INCLUDE_vTaskPrioritySet == 1) && (configUSE_EDF == 1) ) */
 /*-----------------------------------------------------------*/
 #if ( (configUSE_EDF == 1) )
-    void taskDoneEDF(TickType_t * pxInitialWakeTime)
+    void vTaskDoneEDF(TickType_t * pxInitialWakeTime)
     {
         TickType_t period = 0;
 
@@ -9142,5 +9142,11 @@ void vTaskResetState( void )
         }
     }
     #endif /* #if ( configGENERATE_RUN_TIME_STATS == 1 ) */
+}
+
+char vTaskIsReadyList(List_t * const pxList)
+{
+    return ((pxList >= &pxReadyTasksLists[0]) && 
+            (pxList <= &pxReadyTasksLists[configMAX_PRIORITIES-1]));
 }
 /*-----------------------------------------------------------*/
