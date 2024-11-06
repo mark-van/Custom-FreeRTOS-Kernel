@@ -1918,11 +1918,6 @@ static void createEDF(  TaskHandle_t * pxCreatedTask,
         maxEDFIndex = minEDFIndex - 1;
     }
 
-    // if schdeuler has already started, update priorities
-    if (xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED)
-    {
-        vTaskUpdatePriorityEDF();
-    }
     taskEXIT_CRITICAL();
 } 
 #endif /*(configUSE_EDF == 1) */
@@ -4122,11 +4117,6 @@ void vTaskStartScheduler( void )
 
         traceSTARTING_SCHEDULER( xIdleTaskHandles );
 
-        /* Calsulate Priorities for EDF */
-        #if ( (INCLUDE_vTaskPrioritySet == 1) && (configUSE_EDF == 1) )
-            vTaskUpdatePriorityEDF();
-        #endif /* (INCLUDE_vTaskPrioritySet == 1) && (configUSE_EDF == 1) */
-
         /* Setting up the timer tick is hardware specific and thus in the
          * portable interface. */
 
@@ -5182,11 +5172,6 @@ BaseType_t xTaskIncrementTick( void )
                     /* Place the unblocked task into the appropriate ready
                      * list. */
                     prvAddTaskToReadyList( pxTCB );
-
-                    /* Update Pirorities if using EDF*/
-                    #if ( configUSE_EDF == 1 )
-                        vTaskUpdatePriorityEDFISR(); 
-                    #endif
 
                     /* A task being unblocked cannot cause an immediate
                      * context switch if preemption is turned off. */
