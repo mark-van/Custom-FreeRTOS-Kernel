@@ -29,6 +29,7 @@
 /* Standard includes. */
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 /* Defining MPU_WRAPPERS_INCLUDED_FROM_API_FILE prevents task.h from redefining
  * all the API functions to use the MPU wrappers.  That should only be done when
@@ -1839,9 +1840,13 @@ static void prvAddNewTaskToReadyList( TCB_t * pxNewTCB ) PRIVILEGED_FUNCTION;
                                     TaskHandle_t * const pxCreatedTask,
                                     UBaseType_t deadline,
                                     UBaseType_t period )
-        {            
-            BaseType_t xReturn = xTaskCreate(pxTaskCode, pcName, uxStackDepth, pvParameters, tskIDLE_PRIORITY, pxCreatedTask);
-            createEDF(pxCreatedTask, deadline, period);
+        {
+            TaskHandle_t handler;
+            TaskHandle_t * _pxCreatedTask = (pxCreatedTask == NULL)? &handler : pxCreatedTask;           
+            BaseType_t xReturn = xTaskCreate(pxTaskCode, pcName, uxStackDepth, pvParameters, tskIDLE_PRIORITY, _pxCreatedTask);
+            printf("TaskHandle_t * const pxCreatedTask: %p\n", _pxCreatedTask);
+            printf("*pxCreatedTask: %p\n", *_pxCreatedTask);
+            createEDF(_pxCreatedTask, deadline, period);
             return xReturn;
         }
 
@@ -1911,6 +1916,7 @@ static void createEDF(  TaskHandle_t * pxCreatedTask,
 
     // update minEDFIndex and maxEDFIndex
     minEDFIndex++;
+    printf("minEDFIndex: %d\n", minEDFIndex);
     while ((xEDFTaskList[minEDFIndex].task != NULL) && (minEDFIndex < configMAX_NUM_TASKS - 1)) {minEDFIndex++;}
     
     if (minEDFIndex > maxEDFIndex + 1)
@@ -3226,7 +3232,7 @@ static void prvInitialiseNewTask( TaskFunction_t pxTaskCode,
         taskENTER_CRITICAL(); // TODO: ciritcal necessary/too long?
         TickType_t currentTime = xTaskGetTickCount();
         TaskHandle_t highestPriorityTask = NULL;
-        for (int k = 0; k < maxEDFIndex; k++)
+        for (int k = 0; k <= maxEDFIndex; k++)
         {
             EDFStatus_t status = xEDFTaskList[k];
             if ((status.task != NULL) && (eTaskGetState(status.task) == eReady))
@@ -3283,10 +3289,12 @@ static void prvInitialiseNewTask( TaskFunction_t pxTaskCode,
     {
         TickType_t period = 0;
 
+        printf("maxEDFIndex: %d\n", maxEDFIndex);
         // update edf list 
         taskENTER_CRITICAL();
-        for (int k = 0; k < maxEDFIndex; k++)
+        for (int k = 0; k <= maxEDFIndex; k++)
         {
+            printf("Check\n");
             if (pxCurrentTCB == xEDFTaskList[k].task)
             {
                 period = xEDFTaskList[k].period;
@@ -3297,10 +3305,12 @@ static void prvInitialiseNewTask( TaskFunction_t pxTaskCode,
         }
         taskEXIT_CRITICAL();
 
+        printf("period > 0?\n");
         // delay task until next period
         if (period > 0)
         {
-            vTaskDelayUntil(pxInitialWakeTime, period);
+            printf("Delay: %ld\n", pdTICKS_TO_MS(period));
+            vTaskDelayUntil(pxInitialWakeTime, pdTICKS_TO_MS(period));
         }
     }
 #endif /* #if ( (configUSE_EDF == 1) ) */
@@ -3315,7 +3325,7 @@ static void prvInitialiseNewTask( TaskFunction_t pxTaskCode,
         UBaseType_t interruptStatus = taskENTER_CRITICAL_FROM_ISR(); // TODO: ciritcal necessary/too long?
         TickType_t currentTime = (TickType_t) xTickCount;
         TaskHandle_t highestPriorityTask = NULL;
-        for (int k = 0; k < maxEDFIndex; k++)
+        for (int k = 0; k <= maxEDFIndex; k++)
         {
             EDFStatus_t status = xEDFTaskList[k];
             if ((status.task != NULL) && (eTaskGetState(status.task) == eReady))
