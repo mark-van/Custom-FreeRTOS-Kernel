@@ -273,6 +273,14 @@
         listINSERT_END( &( pxReadyTasksLists[ ( pxTCB )->uxPriority ] ), &( ( pxTCB )->xStateListItem ) ); \
         tracePOST_MOVED_TASK_TO_READY_STATE( pxTCB );                                                      \
     } while( 0 )
+
+#define prvAddTaskToReadyListFromPSet( pxTCB )                                                                     \
+    do {                                                                                                   \
+        traceMOVED_TASK_TO_READY_STATE( pxTCB );                                                           \
+        taskRECORD_READY_PRIORITY( ( pxTCB )->uxPriority );                                                \
+        listINSERT_END_FROM_PSET( &( pxReadyTasksLists[ ( pxTCB )->uxPriority ] ), &( ( pxTCB )->xStateListItem ) ); \
+        tracePOST_MOVED_TASK_TO_READY_STATE( pxTCB );                                                      \
+    } while( 0 )
 /*-----------------------------------------------------------*/
 
 /*
@@ -1925,6 +1933,11 @@ static void createEDF(  TaskHandle_t * pxCreatedTask,
     }
 
     taskEXIT_CRITICAL();
+
+    printf("minEDFIndex-1: %d\n", minEDFIndex-1);
+    printf("xEDFTaskList[minEDFIndex-1].deadline: %ld\n", xEDFTaskList[minEDFIndex-1].deadline);
+    printf("xEDFTaskList[minEDFIndex-1].period: %ld\n", xEDFTaskList[minEDFIndex-1].period);
+    printf("xEDFTaskList[minEDFIndex-1].task: %p\n", xEDFTaskList[minEDFIndex-1].task);
 } 
 #endif /*(configUSE_EDF == 1) */
 /*-----------------------------------------------------------*/
@@ -3067,7 +3080,7 @@ static void prvInitialiseNewTask( TaskFunction_t pxTaskCode,
                     /* The task is currently in its ready list - remove before
                      * adding it to its new ready list.  As we are in a critical
                      * section we can do this even if the scheduler is suspended. */
-                    if( uxListRemove( &( pxTCB->xStateListItem ) ) == ( UBaseType_t ) 0 )
+                    if( uxListRemoveFromPSet( &( pxTCB->xStateListItem ) ) == ( UBaseType_t ) 0 )
                     {
                         /* It is known that the task is in its ready list so
                          * there is no need to check again and the port level
@@ -3079,7 +3092,7 @@ static void prvInitialiseNewTask( TaskFunction_t pxTaskCode,
                         mtCOVERAGE_TEST_MARKER();
                     }
 
-                    prvAddTaskToReadyList( pxTCB );
+                    prvAddTaskToReadyListFromPSet( pxTCB );
                 }
                 else
                 {
@@ -3231,9 +3244,11 @@ static void prvInitialiseNewTask( TaskFunction_t pxTaskCode,
 
         taskENTER_CRITICAL(); // TODO: ciritcal necessary/too long?
         TickType_t currentTime = xTaskGetTickCount();
-        TaskHandle_t highestPriorityTask = NULL;
+        TaskHandle_t highestPriorityTask = pxCurrentTCB;
+        //printf("maxEDFIndex: %d\n", maxEDFIndex);
         for (int k = 0; k <= maxEDFIndex; k++)
         {
+            char option = 99;
             EDFStatus_t status = xEDFTaskList[k];
             if ((status.task != NULL) && (eTaskGetState(status.task) == eReady))
             {
@@ -3242,15 +3257,18 @@ static void prvInitialiseNewTask( TaskFunction_t pxTaskCode,
                     // missed deadline condition
                     if ((currentTime < status.periodStartTime) || (currentTime >= status.deadlineTime))
                     {
+                        option = 1;
                         tempTimeToDeadline = 0; // deadline has passed
                     }
                     else
                     {
+                        option = 2;
                         tempTimeToDeadline = status.deadlineTime - currentTime;
                     }
                 }
                 else if (currentTime >= status.periodStartTime)
                 {
+                    option = 3;
                     tempTimeToDeadline = (portMAX_DELAY + 1 - currentTime) + status.deadline;
                 }
                 else //  (deadline < arrival time) AND (current tme > arrival)
@@ -3258,15 +3276,18 @@ static void prvInitialiseNewTask( TaskFunction_t pxTaskCode,
                     // missed deadline condition
                     if (currentTime >= status.deadlineTime)
                     {
+                        option = 4;
                         tempTimeToDeadline = 0; // deadline has passed
                     }
                     else
                     {
+                        option = 5;
                         tempTimeToDeadline = status.deadlineTime - currentTime;
                     }
 
                 }
-
+                printf("option: %d, shotestTimeToDeadline: %lu, k: %d, tempTimeToDeadline: %ld\n", 
+                        option, shotestTimeToDeadline, k, tempTimeToDeadline);
                 if (tempTimeToDeadline < shotestTimeToDeadline)
                 {
                     shotestTimeToDeadline = tempTimeToDeadline;
@@ -3274,29 +3295,49 @@ static void prvInitialiseNewTask( TaskFunction_t pxTaskCode,
                 }
             }
         }
-        if (highestPriorityTask != pxCurrentTCB)
+
+        if (&(highestPriorityTask->xEventListItem) != &(pxCurrentTCB->xEventListItem))
         {
             vTaskPrioritySet(highestPriorityTask, configMAX_PRIORITIES - 1);
-            vTaskPrioritySet(pxCurrentTCB, tskIDLE_PRIORITY);
-            
+            vTaskPrioritySet(pxCurrentTCB, tskIDLE_PRIORITY);  
         }
+
+        UBaseType_t temp1 = pxReadyTasksLists[configMAX_PRIORITIES - 1].uxNumberOfItems;
+        ListItem_t * temp2 = pxReadyTasksLists[configMAX_PRIORITIES - 1].pxIndex;
+        UBaseType_t temp3 = pxReadyTasksLists[tskIDLE_PRIORITY].uxNumberOfItems;
+        ListItem_t * temp4 = pxReadyTasksLists[tskIDLE_PRIORITY].pxIndex;
         taskEXIT_CRITICAL();
+
+        printf("pxReadyTasksLists[configMAX_PRIORITIES - 1].uxNumberOfItems: %ld, pxReadyTasksLists[configMAX_PRIORITIES - 1].pxIndex: %p\n", 
+                temp1, temp2);
+
+        printf("pxReadyTasksLists[tskIDLE_PRIORITY].uxNumberOfItems: %ld, pxReadyTasksLists[tskIDLE_PRIORITY].pxIndex: %p\n", 
+                temp3, temp4);
+
+
+        // PRINT STATUS FOR BOTHS TASKS:
+        // printf("xEDFTaskList[0].periodStartTime: %ld, xEDFTaskList[0].deadlineTime: %ld, xEDFTaskList[0].task: %p\n",
+        //         xEDFTaskList[0].periodStartTime, xEDFTaskList[0].deadlineTime, xEDFTaskList[0].task);
+        // printf("xEDFTaskList[1].periodStartTime: %ld, xEDFTaskList[1].deadlineTime: %ld, xEDFTaskList[1].task: %p\n",
+        //         xEDFTaskList[1].periodStartTime, xEDFTaskList[1].deadlineTime, xEDFTaskList[1].task);
+        // printf("&(highestPriorityTask->xEventListItem): %p\n", &(highestPriorityTask->xEventListItem));
+        // printf("&(pxCurrentTCB->xEventListItem): %p\n", &(pxCurrentTCB->xEventListItem));
     }
 #endif /* #if ( (INCLUDE_vTaskPrioritySet == 1) && (configUSE_EDF == 1) ) */
 /*-----------------------------------------------------------*/
 #if ( (configUSE_EDF == 1) )
     void vTaskDoneEDF(TickType_t * pxInitialWakeTime)
     {
+        //printf("Start vTaskDoneEDF, pxCurrentTCB: %p\n", pxCurrentTCB);
         TickType_t period = 0;
 
-        printf("maxEDFIndex: %d\n", maxEDFIndex);
         // update edf list 
         taskENTER_CRITICAL();
         for (int k = 0; k <= maxEDFIndex; k++)
         {
-            printf("Check\n");
             if (pxCurrentTCB == xEDFTaskList[k].task)
             {
+                //printf("k: %d\n", k);
                 period = xEDFTaskList[k].period;
                 xEDFTaskList[k].periodStartTime = (xEDFTaskList[k].periodStartTime + period) % portMAX_DELAY;
                 xEDFTaskList[k].deadlineTime = (xEDFTaskList[k].periodStartTime + xEDFTaskList[k].deadline) % portMAX_DELAY;
@@ -3305,13 +3346,14 @@ static void prvInitialiseNewTask( TaskFunction_t pxTaskCode,
         }
         taskEXIT_CRITICAL();
 
-        printf("period > 0?\n");
         // delay task until next period
         if (period > 0)
         {
-            printf("Delay: %ld\n", pdTICKS_TO_MS(period));
+            //printf("Delay: %ld\n", pdTICKS_TO_MS(period));
             vTaskDelayUntil(pxInitialWakeTime, pdTICKS_TO_MS(period));
         }
+
+        //printf("End vTaskDoneEDF, pxCurrentTCB: %p\n", pxCurrentTCB);
     }
 #endif /* #if ( (configUSE_EDF == 1) ) */
 /*-----------------------------------------------------------*/
@@ -3324,7 +3366,7 @@ static void prvInitialiseNewTask( TaskFunction_t pxTaskCode,
 
         UBaseType_t interruptStatus = taskENTER_CRITICAL_FROM_ISR(); // TODO: ciritcal necessary/too long?
         TickType_t currentTime = (TickType_t) xTickCount;
-        TaskHandle_t highestPriorityTask = NULL;
+        TaskHandle_t highestPriorityTask = pxCurrentTCB;
         for (int k = 0; k <= maxEDFIndex; k++)
         {
             EDFStatus_t status = xEDFTaskList[k];

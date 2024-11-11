@@ -272,3 +272,37 @@ UBaseType_t uxListRemove( ListItem_t * const pxItemToRemove )
     return pxList->uxNumberOfItems;
 }
 /*-----------------------------------------------------------*/
+
+
+UBaseType_t uxListRemoveFromPSet( ListItem_t * const pxItemToRemove )
+{
+    /* The list item knows which list it is in.  Obtain the list from the list
+     * item. */
+    List_t * const pxList = pxItemToRemove->pxContainer;
+
+    traceENTER_uxListRemove( pxItemToRemove );
+
+    pxItemToRemove->pxNext->pxPrevious = pxItemToRemove->pxPrevious;
+    pxItemToRemove->pxPrevious->pxNext = pxItemToRemove->pxNext;
+
+    /* Only used during decision coverage testing. */
+    mtCOVERAGE_TEST_DELAY();
+
+    /* Make sure the index is left pointing to a valid item. */
+    if( pxList->pxIndex == pxItemToRemove )
+    {
+        pxList->pxIndex = pxItemToRemove->pxPrevious;
+    }
+    else
+    {
+        mtCOVERAGE_TEST_MARKER();
+    }
+
+    pxItemToRemove->pxContainer = NULL;
+    ( pxList->uxNumberOfItems ) = ( UBaseType_t ) ( pxList->uxNumberOfItems - 1U );
+
+    traceRETURN_uxListRemove( pxList->uxNumberOfItems );
+
+    return pxList->uxNumberOfItems;
+}
+/*-----------------------------------------------------------*/
