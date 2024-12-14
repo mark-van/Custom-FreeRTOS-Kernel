@@ -418,6 +418,34 @@ typedef enum
 					        UBaseType_t period ) PRIVILEGED_FUNCTION;
 #endif
 
+/** Create CBS Task 
+*
+*   @param maxBudget       Maximum dudget of cost value
+*
+*   @param serverPeriod    Period of server
+*/
+
+#if ( configSUPPORT_DYNAMIC_ALLOCATION == 1 && configUSE_EDF == 1 && configUSE_CBS == 1)
+    BaseType_t xTaskCreateCBS( TaskFunction_t pxTaskCode,
+                            const char * const pcName,
+                            const configSTACK_DEPTH_TYPE uxStackDepth,
+                            void * const pvParameters,
+                            TaskHandle_t * const pxCreatedTask,
+                            UBaseType_t maxBudget,
+					        UBaseType_t serverPeriod ) PRIVILEGED_FUNCTION;
+#endif
+
+/** Task Create when using EDF 
+* 
+*   @param pxTaskCode Pointer to the task entry function.  Jobs
+*   must be implemented to return (i.e. no continuous loops).
+*
+*/
+
+#if ( configSUPPORT_DYNAMIC_ALLOCATION == 1 && configUSE_EDF == 1 && configUSE_CBS == 1)
+    BaseType_t xTaskCreateJobCBS( TaskFunction_t pxTaskCode) PRIVILEGED_FUNCTION;
+#endif
+
 
 
 /**
