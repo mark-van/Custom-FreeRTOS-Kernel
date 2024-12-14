@@ -431,6 +431,7 @@ typedef enum
                             const configSTACK_DEPTH_TYPE uxStackDepth,
                             void * const pvParameters,
                             TaskHandle_t * const pxCreatedTask,
+                            UBaseType_t * indexCBS,
                             UBaseType_t maxBudget,
 					        UBaseType_t serverPeriod ) PRIVILEGED_FUNCTION;
 #endif
@@ -443,7 +444,7 @@ typedef enum
 */
 
 #if ( configSUPPORT_DYNAMIC_ALLOCATION == 1 && configUSE_EDF == 1 && configUSE_CBS == 1)
-    BaseType_t xTaskCreateJobCBS( TaskFunction_t pxTaskCode) PRIVILEGED_FUNCTION;
+    BaseType_t xTaskCreateJobCBS( TaskFunction_t pxTaskCode, UBaseType_t indexCBS) PRIVILEGED_FUNCTION;
 #endif
 
 
