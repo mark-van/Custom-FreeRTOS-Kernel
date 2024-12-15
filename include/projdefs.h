@@ -35,6 +35,14 @@
  */
 typedef void (* TaskFunction_t)( void * arg );
 
+struct jobClosure
+{
+    TaskFunction_t job;
+    void * arg;
+};
+#define MAKE_CLOSURE(j, arg) (struct jobClosure){(j), (arg)}
+#define RUN_CLOSURE(c) ((*(c.job))(c.arg))
+
 /* Converts a time in milliseconds to a time in ticks.  This macro can be
  * overridden by a macro of the same name defined in FreeRTOSConfig.h in case the
  * definition here is not suitable for your application. */

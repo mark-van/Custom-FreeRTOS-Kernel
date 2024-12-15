@@ -41,6 +41,7 @@
 #include "task.h"
 #include "timers.h"
 #include "stack_macros.h"
+#include "queue.h"
 
 /* The default definitions are only available for non-MPU ports. The
  * reason is that the stack alignment requirements vary for different
@@ -534,7 +535,7 @@ PRIVILEGED_DATA static List_t xPendingReadyList;                         /**< Ta
 #endif /* ( configUSE_EDF == 1 ) */
 
 #if ( (configUSE_CBS == 1) )
-    static QueueHandle_t queueCBS[configMAX_NUM_JOBS_CBS];
+    static QueueHandle_t queueCBS[configMAX_NUM_SERVERS_CBS];
     static UBaseType_t serverIndexCBS[configMAX_NUM_SERVERS_CBS];
     static UBaseType_t numServersCBS;
     typedef struct xCBS
@@ -542,12 +543,10 @@ PRIVILEGED_DATA static List_t xPendingReadyList;                         /**< Ta
         TickType_t   maxBudget;     // relative time
         TickType_t   serverPeriod;  // relative time
         TickType_t   cost;
-        TickType_t   deadline;      // absolute time
-        uint8_t taskIsCBS;
+        volatile TickType_t * deadline;      // absolute time
     } statusCBS_t;
     PRIVILEGED_DATA static statusCBS_t volatile xCBSTaskList[configMAX_NUM_SERVERS_CBS]; // TODO: PRIVILEGED_DATA? volatile?
-    static void createCBS(  TaskHandle_t * pxCreatedTask,
-                            UBaseType_t maxBudget,
+    static void createCBS(  UBaseType_t maxBudget,
                             UBaseType_t serverPeriod);
     static void taskCBS( void *pvParameters );
 #endif /*(configUSE_CBS == 1) */
@@ -1860,7 +1859,7 @@ static void prvAddNewTaskToReadyList( TCB_t * pxNewTCB ) PRIVILEGED_FUNCTION;
         }
 
         #if (configUSE_CBS)
-            pxCreatedTask->taskIsCBS = 0;
+            (*pxCreatedTask)->taskIsCBS = 0;
         #endif
 
         traceRETURN_xTaskCreate( xReturn );
@@ -1893,7 +1892,6 @@ static void prvAddNewTaskToReadyList( TCB_t * pxNewTCB ) PRIVILEGED_FUNCTION;
     #if ( configSUPPORT_DYNAMIC_ALLOCATION == 1 && configUSE_EDF == 1 && configUSE_CBS == 1)
         BaseType_t xTaskCreateCBS(  const char * const pcName,
                                     const configSTACK_DEPTH_TYPE uxStackDepth,
-                                    void * const pvParameters,
                                     TaskHandle_t * const pxCreatedTask,
                                     UBaseType_t * indexCBS,
                                     UBaseType_t maxBudget,
@@ -1903,40 +1901,41 @@ static void prvAddNewTaskToReadyList( TCB_t * pxNewTCB ) PRIVILEGED_FUNCTION;
             TaskHandle_t * _pxCreatedTask = (pxCreatedTask == NULL)? &handler : pxCreatedTask;
 
             // Create metadat for CBS task
-            createCBS(pxTaskmaxBudget, serverPeriod);
+            createCBS(maxBudget, serverPeriod);
 
             // set CBS index
             *indexCBS = numServersCBS;
 
             // Create CBS task         
             BaseType_t xReturn = xTaskCreate(taskCBS, pcName, uxStackDepth, &serverIndexCBS[numServersCBS], tskIDLE_PRIORITY, _pxCreatedTask);
-            pxCreatedTask->taskIsCBS = 1;
+            (*pxCreatedTask)->taskIsCBS = 1;
             printf("TaskHandle_t * const pxCreatedTask: %p\n", _pxCreatedTask);
             printf("*pxCreatedTask: %p\n", *_pxCreatedTask);
 
             // create edf metadata, and suspend task before it can be used
             taskENTER_CRITICAL();
-            createEDF(pxCreatedTask, 0, 0)
+            xCBSTaskList[numServersCBS].deadline = &xEDFTaskList[minEDFIndex].deadlineTime;
+            createEDF(pxCreatedTask, 0, 0);
             numServersCBS++;
-            vTaskSuspend(pxCreatedTask)
             taskEXIT_CRITICAL();
 
             return xReturn;
         }
 
-        BaseType_t xTaskCreateJobCBS( TaskFunction_t pxJobCode, UBaseType_t indexCBS)
+        BaseType_t xTaskCreateJobCBS( TaskFunction_t pxJobCode, void *arg, UBaseType_t indexCBS)
         {
-             // enqueue job
-            BaseType_t xReturn = xQueueSendToBack( queueCBS[indexCBS], ( void * ) &pxJobCode, ( TickType_t ) 0 );
+            // enqueue job
+            struct jobClosure closure =  MAKE_CLOSURE(pxJobCode, arg);
+            BaseType_t xReturn = xQueueSendToBack( queueCBS[indexCBS], ( void * ) &closure, ( TickType_t ) 0 );
             
             // update cost if server was idle
             if (uxQueueMessagesWaiting(queueCBS[indexCBS]) == 1)
             {
                 TickType_t arrival_time = xTaskGetTickCount();
                 if (arrival_time + (xCBSTaskList[indexCBS].cost / xCBSTaskList[indexCBS].maxBudget)
-                    * xCBSTaskList[indexCBS].serverPeriod >= xCBSTaskList[indexCBS].deadline)
+                    * xCBSTaskList[indexCBS].serverPeriod >= *(xCBSTaskList[indexCBS].deadline))
                 {
-                    xCBSTaskList[indexCBS].deadline = arrival_time + xCBSTaskList[indexCBS].serverPeriod;
+                    *(xCBSTaskList[indexCBS].deadline) = arrival_time + xCBSTaskList[indexCBS].serverPeriod;
                     xCBSTaskList[indexCBS].cost = xCBSTaskList[indexCBS].maxBudget;
                 }
             }
@@ -1946,11 +1945,11 @@ static void prvAddNewTaskToReadyList( TCB_t * pxNewTCB ) PRIVILEGED_FUNCTION;
 
         static void taskCBS( void *pvParameters )
         {
-            TaskFunction_t receive;
+            struct jobClosure receive;
             for(;;)
             {
                 BaseType_t err;
-                err = xQueueReceive(queueCBS[pvParameters], &(receive), portMAX_DELAY);
+                err = xQueueReceive(queueCBS[*((int8_t*)pvParameters)], &(receive), portMAX_DELAY);
 
                 if(err != pdPASS)
                 {
@@ -1959,9 +1958,7 @@ static void prvAddNewTaskToReadyList( TCB_t * pxNewTCB ) PRIVILEGED_FUNCTION;
                 } 
 
                 // run receive funtion
-                receive();
-                err = xQueueDequeue(queueCBS[pvParameters], &(receive), portMAX_DELAY);
-
+                RUN_CLOSURE(receive);
             }
         }
     #endif
@@ -2048,17 +2045,15 @@ static void createEDF(  TaskHandle_t * pxCreatedTask,
 #endif /*(configUSE_EDF == 1) */
 /*-----------------------------------------------------------*/
 #if ( (configUSE_CBS == 1) )
-static void createCBS(  TaskHandle_t * pxCreatedTask,
-                        UBaseType_t maxBudget,
+static void createCBS(  UBaseType_t maxBudget,
                         UBaseType_t serverPeriod)
 {
-    queueCBS[numServersCBS] = xQueueCreate( sizeof(TaskHandle_t), config_MAX_NUM_JOBS_CBS);
+    queueCBS[numServersCBS] = xQueueCreate(config_MAX_NUM_JOBS_CBS, sizeof(struct jobClosure));
     serverIndexCBS[numServersCBS] = numServersCBS;
-    xCBSTaskList[numServersCBS] =   {
+    xCBSTaskList[numServersCBS] =   (statusCBS_t){
                                         .maxBudget = maxBudget,
                                         .serverPeriod = serverPeriod,
-                                        .cost = maxBudget,
-                                        .deadline = 0
+                                        .cost = maxBudget
                                     };
 }
 #endif /*(configUSE_CBS == 1) */
@@ -5262,15 +5257,15 @@ BaseType_t xTaskIncrementTick( void )
     traceTASK_INCREMENT_TICK( xTickCount );
 
     #if (configUSE_CBS == 1)
-        if(pxCurrentTCB->uxCBS.taskIsCBS)
+        if(pxCurrentTCB->taskIsCBS)
         {
-            uint8_t indexCBS = pxCurrentTCB->uxCBS.indexCBS
+            uint8_t indexCBS = pxCurrentTCB->indexCBS;
             xCBSTaskList[indexCBS].cost -= 1;
 
             if (xCBSTaskList[indexCBS].cost == 0)
             {
                 xCBSTaskList[indexCBS].cost = xCBSTaskList[indexCBS].maxBudget;
-                xCBSTaskList[indexCBS].deadline +=  xCBSTaskList[indexCBS].serverPeriod
+                *(xCBSTaskList[indexCBS].deadline) +=  xCBSTaskList[indexCBS].serverPeriod;
             }
         }
     #endif /* (configUSE_CBS == 1) */
