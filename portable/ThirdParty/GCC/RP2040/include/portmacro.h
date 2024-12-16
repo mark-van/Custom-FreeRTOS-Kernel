@@ -38,6 +38,7 @@
 
 #include "pico.h"
 #include "hardware/sync.h"
+#include "hardware/gpio.h"
 
 /*-----------------------------------------------------------
  * Port specific definitions.
@@ -202,6 +203,12 @@ extern void vPortEnableInterrupts();
 #endif /* if ( configNUMBER_OF_CORES == 1 ) */
 
 #define portRTOS_SPINLOCK_COUNT    2
+
+#if ( configUSE_APPLICATION_TASK_TAG == 1 )
+    #define traceTASK_SWITCHED_OUT()    do { if( pxCurrentTCB->pxTaskTag != NULL ) gpio_clr_mask( (uint32_t)pxCurrentTCB->pxTaskTag ); } while( 0 )
+    #define traceTASK_SWITCHED_IN()     do { if( pxCurrentTCB->pxTaskTag != NULL ) gpio_set_mask( (uint32_t)pxCurrentTCB->pxTaskTag ); } while( 0 )
+#endif /* if ( configUSE_APPLICATION_TASK_TAG == 1 ) */
+
 
 /* Note this is a single method with uxAcquire parameter since we have
  * static vars, the method is always called with a compile time constant for

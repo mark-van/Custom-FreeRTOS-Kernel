@@ -1937,6 +1937,7 @@ static void prvAddNewTaskToReadyList( TCB_t * pxNewTCB ) PRIVILEGED_FUNCTION;
                 {
                     *(xCBSTaskList[indexCBS].deadline) = arrival_time + xCBSTaskList[indexCBS].serverPeriod;
                     xCBSTaskList[indexCBS].cost = xCBSTaskList[indexCBS].maxBudget;
+                    vTaskUpdatePriorityEDF();
                 }
             }
 
@@ -2051,9 +2052,9 @@ static void createCBS(  UBaseType_t maxBudget,
     queueCBS[numServersCBS] = xQueueCreate(config_MAX_NUM_JOBS_CBS, sizeof(struct jobClosure));
     serverIndexCBS[numServersCBS] = numServersCBS;
     xCBSTaskList[numServersCBS] =   (statusCBS_t){
-                                        .maxBudget = maxBudget,
-                                        .serverPeriod = serverPeriod,
-                                        .cost = maxBudget
+                                        .maxBudget = pdMS_TO_TICKS(maxBudget),
+                                        .serverPeriod = pdMS_TO_TICKS(serverPeriod),
+                                        .cost = pdMS_TO_TICKS(maxBudget)
                                     };
 }
 #endif /*(configUSE_CBS == 1) */
@@ -5266,6 +5267,7 @@ BaseType_t xTaskIncrementTick( void )
             {
                 xCBSTaskList[indexCBS].cost = xCBSTaskList[indexCBS].maxBudget;
                 *(xCBSTaskList[indexCBS].deadline) +=  xCBSTaskList[indexCBS].serverPeriod;
+                vTaskUpdatePriorityEDF();
             }
         }
     #endif /* (configUSE_CBS == 1) */
