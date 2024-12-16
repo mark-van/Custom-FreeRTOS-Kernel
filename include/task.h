@@ -3866,7 +3866,9 @@ void vTaskInternalSetTimeOutState( TimeOut_t * const pxTimeOut ) PRIVILEGED_FUNC
  * @param pxList Pointer to the list being checked.
  *
  */
-char vTaskIsReadyList(List_t * const pxList);
+#if ( (configUSE_EDF == 1) )
+    char vTaskIsReadyList(List_t * const pxList);
+#endif /* #if ( (configUSE_EDF == 1) ) */
 
 /* *INDENT-OFF* */
 #ifdef __cplusplus
