@@ -1950,6 +1950,16 @@ static void prvAddNewTaskToReadyList( TCB_t * pxNewTCB ) PRIVILEGED_FUNCTION;
 
                     setCBSRelativeDeadine(indexCBS);
                     vTaskUpdatePriorityEDF();
+                    
+                    // Rule 1
+                    gpio_set_mask( 1u << 27 );
+                    gpio_clr_mask( 1u << 27 );
+                }
+                else
+                {
+                    // Rule 2
+                    gpio_set_mask( 1u << 28 );
+                    gpio_clr_mask( 1u << 28 );
                 }
             }
 
@@ -5332,6 +5342,10 @@ BaseType_t xTaskIncrementTick( void )
                 *(xCBSTaskList[indexCBS].periodStartTime) = xTaskGetTickCount();
                 setCBSRelativeDeadine(indexCBS);
                 vTaskUpdatePriorityEDF();
+
+                // Rule 3
+                gpio_set_mask( 1u << 2 );
+                gpio_clr_mask( 1u << 2 );
             }
         }
     #endif /* (configUSE_CBS == 1) */
