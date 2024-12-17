@@ -510,7 +510,7 @@ PRIVILEGED_DATA static List_t xPendingReadyList;                         /**< Ta
     static void createEDF(  TaskHandle_t * pxCreatedTask,
                             UBaseType_t deadline,
                             UBaseType_t period);
-    static const UBaseType_t uxEDFPriority = configMAX_PRIORITIES - 2;
+
     
     
     #if ( (INCLUDE_vTaskPrioritySet == 1))
@@ -1950,16 +1950,6 @@ static void prvAddNewTaskToReadyList( TCB_t * pxNewTCB ) PRIVILEGED_FUNCTION;
 
                     setCBSRelativeDeadine(indexCBS);
                     vTaskUpdatePriorityEDF();
-                    
-                    // Rule 1
-                    gpio_set_mask( 1u << 27 );
-                    gpio_clr_mask( 1u << 27 );
-                }
-                else
-                {
-                    // Rule 2
-                    gpio_set_mask( 1u << 28 );
-                    gpio_clr_mask( 1u << 28 );
                 }
             }
 
@@ -3403,18 +3393,7 @@ static void prvInitialiseNewTask( TaskFunction_t pxTaskCode,
 
         taskENTER_CRITICAL(); // TODO: ciritcal necessary/too long?
         TickType_t currentTime = xTaskGetTickCount();
-        if (listCURRENT_LIST_LENGTH( &( pxReadyTasksLists[ uxEDFPriority ] )) > 1)
-        {
-            printf("\n\n\n!!!!ERROR STATE!!!!\n\n\n");
-        }
-
-        printf("Length = %lu\n", listCURRENT_LIST_LENGTH( &( pxReadyTasksLists[ uxEDFPriority ] )));
-
-        TaskHandle_t highestPriorityTask = NULL;
-        TaskHandle_t prevHighestPriorityTask;
-        listGET_OWNER_OF_NEXT_ENTRY(prevHighestPriorityTask, &( pxReadyTasksLists[uxEDFPriority ]));
-
-        printf("prevHighestPriorityTask: %p\n", prevHighestPriorityTask);
+        TaskHandle_t highestPriorityTask = pxCurrentTCB;
         //printf("maxEDFIndex: %d\n", maxEDFIndex);
         for (int k = 0; k <= maxEDFIndex; k++)
         {
@@ -3466,25 +3445,21 @@ static void prvInitialiseNewTask( TaskFunction_t pxTaskCode,
             }
         }
 
-        printf("highestPriorityTask: %p\n", highestPriorityTask);
-
-        if (&(highestPriorityTask->xEventListItem) != &(prevHighestPriorityTask->xEventListItem))
+        if (&(highestPriorityTask->xEventListItem) != &(pxCurrentTCB->xEventListItem))
         {
-            vTaskPrioritySet(highestPriorityTask, uxEDFPriority);
-            vTaskPrioritySet(prevHighestPriorityTask, tskIDLE_PRIORITY);
-            // if (pxCurrentTCB->uxPriority <= uxEDFPriority)
-            // {
-            //     vTaskPrioritySet(pxCurrentTCB, tskIDLE_PRIORITY);  
-            // }
+            vTaskPrioritySet(highestPriorityTask, configMAX_PRIORITIES - 2);
+
+            
+            vTaskPrioritySet(pxCurrentTCB, tskIDLE_PRIORITY);  
         }
 
-        // UBaseType_t temp1 = pxReadyTasksLists[uxEDFPriority].uxNumberOfItems;
-        // ListItem_t * temp2 = pxReadyTasksLists[uxEDFPriority].pxIndex;
+        // UBaseType_t temp1 = pxReadyTasksLists[configMAX_PRIORITIES - 2].uxNumberOfItems;
+        // ListItem_t * temp2 = pxReadyTasksLists[configMAX_PRIORITIES - 2].pxIndex;
         // UBaseType_t temp3 = pxReadyTasksLists[tskIDLE_PRIORITY].uxNumberOfItems;
         // ListItem_t * temp4 = pxReadyTasksLists[tskIDLE_PRIORITY].pxIndex;
         taskEXIT_CRITICAL();
 
-        //printf("pxReadyTasksLists[uxEDFPriority].uxNumberOfItems: %ld, pxReadyTasksLists[uxEDFPriority].pxIndex: %p\n", 
+        //printf("pxReadyTasksLists[configMAX_PRIORITIES - 2].uxNumberOfItems: %ld, pxReadyTasksLists[configMAX_PRIORITIES - 2].pxIndex: %p\n", 
         //         temp1, temp2);
 
         //printf("pxReadyTasksLists[tskIDLE_PRIORITY].uxNumberOfItems: %ld, pxReadyTasksLists[tskIDLE_PRIORITY].pxIndex: %p\n\n", 
@@ -3601,7 +3576,7 @@ static void prvInitialiseNewTask( TaskFunction_t pxTaskCode,
         }
         if (highestPriorityTask != pxCurrentTCB)
         {
-            vTaskPrioritySetISR(highestPriorityTask, uxEDFPriority);
+            vTaskPrioritySetISR(highestPriorityTask, configMAX_PRIORITIES - 2);
             vTaskPrioritySetISR(pxCurrentTCB, tskIDLE_PRIORITY);
             
         }
@@ -5342,10 +5317,6 @@ BaseType_t xTaskIncrementTick( void )
                 *(xCBSTaskList[indexCBS].periodStartTime) = xTaskGetTickCount();
                 setCBSRelativeDeadine(indexCBS);
                 vTaskUpdatePriorityEDF();
-
-                // Rule 3
-                gpio_set_mask( 1u << 2 );
-                gpio_clr_mask( 1u << 2 );
             }
         }
     #endif /* (configUSE_CBS == 1) */
@@ -9392,11 +9363,9 @@ void vTaskResetState( void )
     #endif /* #if ( configGENERATE_RUN_TIME_STATS == 1 ) */
 }
 
-#if ( configUSE_EDF == 1 )
-    char vTaskIsReadyList(List_t * const pxList)
-    {
-        return ((pxList >= &pxReadyTasksLists[0]) && 
-                (pxList <= &pxReadyTasksLists[uxEDFPriority]));
-    }
-#endif
+char vTaskIsReadyList(List_t * const pxList)
+{
+    return ((pxList >= &pxReadyTasksLists[0]) && 
+            (pxList <= &pxReadyTasksLists[configMAX_PRIORITIES - 2]));
+}
 /*-----------------------------------------------------------*/
