@@ -28,6 +28,7 @@
 
 
 #include <stdlib.h>
+#include <stdio.h>
 
 /* Defining MPU_WRAPPERS_INCLUDED_FROM_API_FILE prevents task.h from redefining
  * all the API functions to use the MPU wrappers.  That should only be done when
@@ -263,10 +264,10 @@ UBaseType_t uxListRemove( ListItem_t * const pxItemToRemove )
 
     #if ( configUSE_EDF == 1 )
         // if a ready list is being edited, then update priorities
-        if (vTaskIsReadyList(pxList))
+        if (vTaskIsReadyList(pxList))                                                               
         {
-            vTaskUpdatePriorityEDF();
-        }
+            vTaskUpdatePriorityEDF();                                                            
+        }   
     #endif
 
     return pxList->uxNumberOfItems;

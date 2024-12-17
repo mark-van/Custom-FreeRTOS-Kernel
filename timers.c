@@ -773,6 +773,8 @@
              * until either a timer does expire, or a command is received. */
             prvProcessTimerOrBlockTask( xNextExpireTime, xListWasEmpty );
 
+        
+
             /* Empty the command queue. */
             prvProcessReceivedCommands();
         }
