@@ -38,6 +38,7 @@
 #include "task.h"
 #include "queue.h"
 #include "timers.h"
+#include "hardware/gpio.h"
 
 #if ( INCLUDE_xTimerPendFunctionCall == 1 ) && ( configUSE_TIMERS == 0 )
     #error configUSE_TIMERS must be set to 1 to make the xTimerPendFunctionCall() function available.
@@ -313,6 +314,9 @@
                                            NULL,
                                            ( ( UBaseType_t ) configTIMER_TASK_PRIORITY ) | portPRIVILEGE_BIT,
                                            &xTimerTaskHandle );
+                    #if ( configUSE_APPLICATION_TASK_TAG == 1 )
+                        vTaskSetApplicationTaskTag(xTimerTaskHandle, ( void * ) (1u << 26));
+                    #endif
                 }
                 #endif /* configSUPPORT_STATIC_ALLOCATION */
             }
@@ -771,7 +775,9 @@
 
             /* If a timer has expired, process it.  Otherwise, block this task
              * until either a timer does expire, or a command is received. */
+            //gpio_clr_mask( 1u << 26 );
             prvProcessTimerOrBlockTask( xNextExpireTime, xListWasEmpty );
+            //gpio_set_mask( 1u << 26 );
 
             /* Empty the command queue. */
             prvProcessReceivedCommands();
