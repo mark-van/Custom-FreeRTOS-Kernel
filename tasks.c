@@ -3447,19 +3447,17 @@ static void prvInitialiseNewTask( TaskFunction_t pxTaskCode,
 
         if (&(highestPriorityTask->xEventListItem) != &(pxCurrentTCB->xEventListItem))
         {
-            vTaskPrioritySet(highestPriorityTask, configMAX_PRIORITIES - 2);
-
-            
+            vTaskPrioritySet(highestPriorityTask, configMAX_PRIORITIES - 1);
             vTaskPrioritySet(pxCurrentTCB, tskIDLE_PRIORITY);  
         }
 
-        // UBaseType_t temp1 = pxReadyTasksLists[configMAX_PRIORITIES - 2].uxNumberOfItems;
-        // ListItem_t * temp2 = pxReadyTasksLists[configMAX_PRIORITIES - 2].pxIndex;
+        // UBaseType_t temp1 = pxReadyTasksLists[configMAX_PRIORITIES - 1].uxNumberOfItems;
+        // ListItem_t * temp2 = pxReadyTasksLists[configMAX_PRIORITIES - 1].pxIndex;
         // UBaseType_t temp3 = pxReadyTasksLists[tskIDLE_PRIORITY].uxNumberOfItems;
         // ListItem_t * temp4 = pxReadyTasksLists[tskIDLE_PRIORITY].pxIndex;
         taskEXIT_CRITICAL();
 
-        //printf("pxReadyTasksLists[configMAX_PRIORITIES - 2].uxNumberOfItems: %ld, pxReadyTasksLists[configMAX_PRIORITIES - 2].pxIndex: %p\n", 
+        //printf("pxReadyTasksLists[configMAX_PRIORITIES - 1].uxNumberOfItems: %ld, pxReadyTasksLists[configMAX_PRIORITIES - 1].pxIndex: %p\n", 
         //         temp1, temp2);
 
         //printf("pxReadyTasksLists[tskIDLE_PRIORITY].uxNumberOfItems: %ld, pxReadyTasksLists[tskIDLE_PRIORITY].pxIndex: %p\n\n", 
@@ -3576,7 +3574,7 @@ static void prvInitialiseNewTask( TaskFunction_t pxTaskCode,
         }
         if (highestPriorityTask != pxCurrentTCB)
         {
-            vTaskPrioritySetISR(highestPriorityTask, configMAX_PRIORITIES - 2);
+            vTaskPrioritySetISR(highestPriorityTask, configMAX_PRIORITIES - 1);
             vTaskPrioritySetISR(pxCurrentTCB, tskIDLE_PRIORITY);
             
         }
@@ -9366,6 +9364,6 @@ void vTaskResetState( void )
 char vTaskIsReadyList(List_t * const pxList)
 {
     return ((pxList >= &pxReadyTasksLists[0]) && 
-            (pxList <= &pxReadyTasksLists[configMAX_PRIORITIES - 2]));
+            (pxList <= &pxReadyTasksLists[configMAX_PRIORITIES-1]));
 }
 /*-----------------------------------------------------------*/
