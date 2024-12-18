@@ -265,6 +265,7 @@ UBaseType_t uxListRemove( ListItem_t * const pxItemToRemove )
         // if a ready list is being edited, then update priorities
         if (vTaskIsReadyList(pxList))
         {
+            //("updateing priority after moving it to delayuse"); 
             vTaskUpdatePriorityEDF();
         }
     #endif

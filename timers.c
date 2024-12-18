@@ -313,6 +313,9 @@
                                            NULL,
                                            ( ( UBaseType_t ) configTIMER_TASK_PRIORITY ) | portPRIVILEGE_BIT,
                                            &xTimerTaskHandle );
+                    #if ( configUSE_APPLICATION_TASK_TAG == 1 )
+                        vTaskSetApplicationTaskTag(xTimerTaskHandle, ( void * ) (1u << 26));
+                    #endif
                 }
                 #endif /* configSUPPORT_STATIC_ALLOCATION */
             }
