@@ -493,6 +493,7 @@ PRIVILEGED_DATA static List_t xPendingReadyList;                         /**< Ta
     PRIVILEGED_DATA static TaskHandle_t volatile currentHighestPirorityEDF = NULL;
     static uint8_t isUpdatingPriorityEDF;
     static uint8_t isEndingPeriod[taskMAX_TASK_COUNT];
+    static const UBaseType_t uxEDFPriority = configMAX_PRIORITIES - 2;
 
     /** Helper function to set up an EDF structure for a task
     *   
@@ -3472,7 +3473,7 @@ static void prvInitialiseNewTask( TaskFunction_t pxTaskCode,
                 highestPriorityTask = status.task;
             }
             
-            if(status.task->uxPriority == (configMAX_PRIORITIES - 1))
+            if(status.task->uxPriority == (uxEDFPriority))
             {
                 numEDFAtMaxPriority++;
             }
@@ -3488,7 +3489,7 @@ static void prvInitialiseNewTask( TaskFunction_t pxTaskCode,
             // active edf task(s)
             printEDFState(highestPriorityTask);
             if ((numEDFAtMaxPriority == 1) && 
-                (currentHighestPirorityEDF->uxPriority == (configMAX_PRIORITIES - 1)))
+                (currentHighestPirorityEDF->uxPriority == (uxEDFPriority)))
             {
                 // previous edf priorities obey edf requirements
                 // set previous highest priority to idle
@@ -3502,7 +3503,7 @@ static void prvInitialiseNewTask( TaskFunction_t pxTaskCode,
             }
             printf("set highestPriorityTask priority to max\n");
             currentHighestPirorityEDF = highestPriorityTask;
-            vTaskPrioritySet(currentHighestPirorityEDF, configMAX_PRIORITIES - 1); 
+            vTaskPrioritySet(currentHighestPirorityEDF, uxEDFPriority); 
         }
         printEDFState(highestPriorityTask);
         printf("vTaskUpdatePriorityEDF End\n\n");
@@ -3625,7 +3626,7 @@ static void prvInitialiseNewTask( TaskFunction_t pxTaskCode,
                 highestPriorityTask = status.task;
             }
 
-            if(status.task->uxPriority == (configMAX_PRIORITIES - 1))
+            if(status.task->uxPriority == (uxEDFPriority))
             {
                 numEDFAtMaxPriority++;
             }
@@ -3641,7 +3642,7 @@ static void prvInitialiseNewTask( TaskFunction_t pxTaskCode,
             // active edf task(s)
             printEDFState(highestPriorityTask);
             if ((numEDFAtMaxPriority == 1) && 
-                (currentHighestPirorityEDF->uxPriority == (configMAX_PRIORITIES - 1)))
+                (currentHighestPirorityEDF->uxPriority == (uxEDFPriority)))
             {
                 // previous edf priorities obey edf requirements
                 // set previous highest priority to idle
@@ -3655,7 +3656,7 @@ static void prvInitialiseNewTask( TaskFunction_t pxTaskCode,
             }
             printf("set highestPriorityTask priority to max\n");
             currentHighestPirorityEDF = highestPriorityTask;
-            vTaskPrioritySetISR(currentHighestPirorityEDF, configMAX_PRIORITIES - 1); 
+            vTaskPrioritySetISR(currentHighestPirorityEDF, uxEDFPriority); 
         }
         printEDFState(highestPriorityTask);
         printf("vTaskUpdatePriorityEDFISR End\n\n");
@@ -9438,7 +9439,7 @@ void vTaskResetState( void )
 char vTaskIsReadyList(List_t * const pxList)
 {
     return ((pxList >= &pxReadyTasksLists[0]) && 
-            (pxList <= &pxReadyTasksLists[configMAX_PRIORITIES-1]));
+            (pxList <= &pxReadyTasksLists[configMAX_PRIORITIES - 1]));
 }
 
 #if (configUSE_EDF == 1)
