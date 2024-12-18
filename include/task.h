@@ -418,6 +418,33 @@ typedef enum
 					        UBaseType_t period ) PRIVILEGED_FUNCTION;
 #endif
 
+/** Create CBS Task 
+*
+*   @param maxBudget       Maximum dudget of cost value
+*
+*   @param serverPeriod    Period of server
+*/
+
+#if ( configSUPPORT_DYNAMIC_ALLOCATION == 1 && configUSE_EDF == 1 && configUSE_CBS == 1)
+    BaseType_t xTaskCreateCBS(  const char * const pcName,
+                                const configSTACK_DEPTH_TYPE uxStackDepth,
+                                TaskHandle_t * const pxCreatedTask,
+                                UBaseType_t * indexCBS,
+                                UBaseType_t maxBudget,
+                                UBaseType_t serverPeriod ) PRIVILEGED_FUNCTION;
+#endif
+
+/** Task Create when using EDF 
+* 
+*   @param pxTaskCode Pointer to the task entry function.  Jobs
+*   must be implemented to return (i.e. no continuous loops).
+*
+*/
+
+#if ( configSUPPORT_DYNAMIC_ALLOCATION == 1 && configUSE_EDF == 1 && configUSE_CBS == 1)
+    BaseType_t xTaskCreateJobCBS( TaskFunction_t pxJobCode, void *arg, UBaseType_t indexCBS) PRIVILEGED_FUNCTION;
+#endif
+
 
 
 /**
@@ -3839,7 +3866,9 @@ void vTaskInternalSetTimeOutState( TimeOut_t * const pxTimeOut ) PRIVILEGED_FUNC
  * @param pxList Pointer to the list being checked.
  *
  */
-char vTaskIsReadyList(List_t * const pxList);
+#if ( (configUSE_EDF == 1) )
+    char vTaskIsReadyList(List_t * const pxList);
+#endif /* #if ( (configUSE_EDF == 1) ) */
 
 /* *INDENT-OFF* */
 #ifdef __cplusplus

@@ -41,6 +41,7 @@
 #include "task.h"
 #include "timers.h"
 #include "stack_macros.h"
+#include "queue.h"
 
 /* The default definitions are only available for non-MPU ports. The
  * reason is that the stack alignment requirements vary for different
@@ -447,6 +448,11 @@ typedef struct tskTaskControlBlock       /* The old naming convention is used to
     #if ( configUSE_POSIX_ERRNO == 1 )
         int iTaskErrno;
     #endif
+
+    #if ( configUSE_CBS == 1 )
+        uint8_t taskIsCBS;
+        UBaseType_t indexCBS;
+    #endif
 } tskTCB;
 
 /* The old tskTCB name is maintained above then typedefed to the new TCB_t name
@@ -532,6 +538,27 @@ PRIVILEGED_DATA static List_t xPendingReadyList;                         /**< Ta
                                     UBaseType_t uxNewPriority );
     #endif
 #endif /* ( configUSE_EDF == 1 ) */
+
+#if ( (configUSE_CBS == 1) )
+    static QueueHandle_t queueCBS[configMAX_NUM_SERVERS_CBS];
+    static UBaseType_t serverIndexCBS[configMAX_NUM_SERVERS_CBS];
+    static UBaseType_t numServersCBS;
+    typedef struct xCBS
+    {
+        TickType_t   maxBudget;     // relative time
+        TickType_t   serverPeriod;  // relative time
+        TickType_t   cost;
+        volatile TickType_t * periodStartTime;   // absolute time
+        volatile TickType_t * deadlineTime;      // absolute time
+        volatile TickType_t * deadline;          // relative time 
+    } statusCBS_t;
+    PRIVILEGED_DATA static statusCBS_t volatile xCBSTaskList[configMAX_NUM_SERVERS_CBS]; // TODO: PRIVILEGED_DATA? volatile?
+    static void createCBS(  UBaseType_t maxBudget,
+                            UBaseType_t serverPeriod,
+                            UBaseType_t serverIndex);
+    static void taskCBS( void *pvParameters );
+    static void setCBSRelativeDeadine( UBaseType_t indexCBS );
+#endif /*(configUSE_CBS == 1) */
 
 #if ( INCLUDE_vTaskDelete == 1 )
 
@@ -1834,6 +1861,10 @@ static void prvAddNewTaskToReadyList( TCB_t * pxNewTCB ) PRIVILEGED_FUNCTION;
 
             prvAddNewTaskToReadyList( pxNewTCB );
             xReturn = pdPASS;
+
+            #if (configUSE_CBS == 1)
+                (*pxCreatedTask)->taskIsCBS = 0;
+            #endif
         }
         else
         {
@@ -1863,6 +1894,107 @@ static void prvAddNewTaskToReadyList( TCB_t * pxNewTCB ) PRIVILEGED_FUNCTION;
             return xReturn;
         }
 
+    #endif
+
+/*-----------------------------------------------------------*/
+
+    #if ( configSUPPORT_DYNAMIC_ALLOCATION == 1 && configUSE_EDF == 1 && configUSE_CBS == 1)
+        BaseType_t xTaskCreateCBS(  const char * const pcName,
+                                    const configSTACK_DEPTH_TYPE uxStackDepth,
+                                    TaskHandle_t * const pxCreatedTask,
+                                    UBaseType_t * indexCBS,
+                                    UBaseType_t maxBudget,
+                                    UBaseType_t serverPeriod )
+        {
+            TaskHandle_t handler;
+            TaskHandle_t * _pxCreatedTask = (pxCreatedTask == NULL)? &handler : pxCreatedTask;
+
+            if (indexCBS == NULL)
+            {
+                return pdFAIL;
+            }
+
+            taskENTER_CRITICAL();
+            *indexCBS = numServersCBS;
+            serverIndexCBS[numServersCBS] = numServersCBS;
+            numServersCBS++;
+            taskEXIT_CRITICAL();
+
+            // Create CBS task         
+            BaseType_t xReturn = xTaskCreate(taskCBS, pcName, uxStackDepth, &serverIndexCBS[*indexCBS], tskIDLE_PRIORITY, _pxCreatedTask);
+            (*pxCreatedTask)->taskIsCBS = 1;
+            printf("TaskHandle_t * const pxCreatedTask: %p\n", _pxCreatedTask);
+            printf("*pxCreatedTask: %p\n", *_pxCreatedTask);
+
+            // create edf metadata, and suspend task before it can be used
+            taskENTER_CRITICAL();
+            // Create metadata for CBS task
+            createCBS(maxBudget, serverPeriod, *indexCBS);
+            createEDF(pxCreatedTask, 0, serverPeriod);
+            taskEXIT_CRITICAL();
+
+            return xReturn;
+        }
+
+        BaseType_t xTaskCreateJobCBS( __attribute__((unused))TaskFunction_t pxJobCode, __attribute__((unused))void *arg, __attribute__((unused))UBaseType_t indexCBS)
+        {
+            // enqueue job
+            struct jobClosure closure =  MAKE_CLOSURE(pxJobCode, arg);
+            BaseType_t xReturn = xQueueSendToBack( queueCBS[indexCBS], ( void * ) &closure, ( TickType_t ) 0 );
+
+            // update cost if server was idle
+            if (uxQueueMessagesWaiting(queueCBS[indexCBS]) == 1)
+            {
+                *(xCBSTaskList[indexCBS].periodStartTime) = xTaskGetTickCount();
+                if (*(xCBSTaskList[indexCBS].periodStartTime) + (xCBSTaskList[indexCBS].cost / xCBSTaskList[indexCBS].maxBudget)
+                    * xCBSTaskList[indexCBS].serverPeriod >= *(xCBSTaskList[indexCBS].deadlineTime))
+                {
+                    *(xCBSTaskList[indexCBS].deadlineTime) =    *(xCBSTaskList[indexCBS].periodStartTime) 
+                                                                + xCBSTaskList[indexCBS].serverPeriod;
+                    xCBSTaskList[indexCBS].cost = xCBSTaskList[indexCBS].maxBudget;
+
+                    setCBSRelativeDeadine(indexCBS);
+                    vTaskUpdatePriorityEDF();
+                }
+            }
+
+            return xReturn;
+        }
+
+        static void setCBSRelativeDeadine( UBaseType_t indexCBS )
+        {
+            taskENTER_CRITICAL();
+            if (*(xCBSTaskList[indexCBS].deadlineTime) > *(xCBSTaskList[indexCBS].periodStartTime))
+            {
+                *(xCBSTaskList[indexCBS].deadline) =    *(xCBSTaskList[indexCBS].deadlineTime) 
+                                                        - *(xCBSTaskList[indexCBS].periodStartTime);
+            }
+            else // overflow condition
+            {
+                *(xCBSTaskList[indexCBS].deadline) =    *(xCBSTaskList[indexCBS].deadlineTime) 
+                                                        + (portMAX_DELAY - *(xCBSTaskList[indexCBS].periodStartTime) + 1);
+            }
+            taskEXIT_CRITICAL();
+        }
+
+        static void taskCBS( void *pvParameters )
+        {
+            struct jobClosure receive;
+            for(;;)
+            {
+                BaseType_t err;
+                err = xQueueReceive(queueCBS[*((int8_t*)pvParameters)], &(receive), portMAX_DELAY);
+
+                if(err != pdPASS)
+                {
+                    // go bacck to waiting for a job
+                    continue;
+                } 
+
+                // run receive funtion
+                RUN_CLOSURE(receive);
+            }
+        }
     #endif
 
 /*-----------------------------------------------------------*/
@@ -1946,6 +2078,23 @@ static void createEDF(  TaskHandle_t * pxCreatedTask,
     printf("xEDFTaskList[minEDFIndex-1].task: %p\n", xEDFTaskList[minEDFIndex-1].task);
 } 
 #endif /*(configUSE_EDF == 1) */
+/*-----------------------------------------------------------*/
+#if ( (configUSE_CBS == 1) )
+static void createCBS(  UBaseType_t maxBudget,
+                        UBaseType_t serverPeriod,
+                        UBaseType_t serverIndex)
+{
+    queueCBS[serverIndex] = xQueueCreate(config_MAX_NUM_JOBS_CBS, sizeof(struct jobClosure));
+    xCBSTaskList[serverIndex] =   (statusCBS_t){
+                                        .maxBudget = pdMS_TO_TICKS(maxBudget),
+                                        .serverPeriod = pdMS_TO_TICKS(serverPeriod),
+                                        .cost = pdMS_TO_TICKS(maxBudget),
+                                        .periodStartTime = &xEDFTaskList[minEDFIndex].periodStartTime,
+                                        .deadlineTime = &xEDFTaskList[minEDFIndex].deadlineTime,
+                                        .deadline = &xEDFTaskList[minEDFIndex].deadline,
+                                    };
+}
+#endif /*(configUSE_CBS == 1) */
 /*-----------------------------------------------------------*/
 static void prvInitialiseNewTask( TaskFunction_t pxTaskCode,
                                   const char * const pcName,
@@ -5388,6 +5537,24 @@ BaseType_t xTaskIncrementTick( void )
      * Increments the tick then checks to see if the new tick value will cause any
      * tasks to be unblocked. */
     traceTASK_INCREMENT_TICK( xTickCount );
+    #if (configUSE_CBS == 1)
+        if(pxCurrentTCB->taskIsCBS)
+        {
+            uint8_t indexCBS = pxCurrentTCB->indexCBS;
+            xCBSTaskList[indexCBS].cost -= 1;
+
+            if (xCBSTaskList[indexCBS].cost == 0)
+            {
+                printf("cost is zero\n");
+                xCBSTaskList[indexCBS].cost = xCBSTaskList[indexCBS].maxBudget;
+                *(xCBSTaskList[indexCBS].deadlineTime) +=  xCBSTaskList[indexCBS].serverPeriod;
+                *(xCBSTaskList[indexCBS].periodStartTime) = xTaskGetTickCount();
+                setCBSRelativeDeadine(indexCBS);
+                vTaskUpdatePriorityEDFISR();
+                printf("done cost is zero\n");
+            }
+        }
+    #endif /* (configUSE_CBS == 1) */
 
     /* Tick increment should occur on every kernel timer event. Core 0 has the
      * responsibility to increment the tick, or increment the pended ticks if the
