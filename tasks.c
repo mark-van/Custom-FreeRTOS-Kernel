@@ -1888,8 +1888,8 @@ static void prvAddNewTaskToReadyList( TCB_t * pxNewTCB ) PRIVILEGED_FUNCTION;
             TaskHandle_t handler;
             TaskHandle_t * _pxCreatedTask = (pxCreatedTask == NULL)? &handler : pxCreatedTask;           
             BaseType_t xReturn = xTaskCreate(pxTaskCode, pcName, uxStackDepth, pvParameters, tskIDLE_PRIORITY, _pxCreatedTask);
-            printf("TaskHandle_t * const pxCreatedTask: %p\n", _pxCreatedTask);
-            printf("*pxCreatedTask: %p\n", *_pxCreatedTask);
+            //printf("TaskHandle_t * const pxCreatedTask: %p\n", _pxCreatedTask);
+            //printf("*pxCreatedTask: %p\n", *_pxCreatedTask);
             createEDF(_pxCreatedTask, deadline, period);
             return xReturn;
         }
@@ -1923,8 +1923,8 @@ static void prvAddNewTaskToReadyList( TCB_t * pxNewTCB ) PRIVILEGED_FUNCTION;
             // Create CBS task         
             BaseType_t xReturn = xTaskCreate(taskCBS, pcName, uxStackDepth, &serverIndexCBS[*indexCBS], tskIDLE_PRIORITY, _pxCreatedTask);
             (*_pxCreatedTask)->taskIsCBS = 1;
-            printf("TaskHandle_t * const pxCreatedTask: %p\n", _pxCreatedTask);
-            printf("*pxCreatedTask: %p\n", *_pxCreatedTask);
+            //printf("TaskHandle_t * const pxCreatedTask: %p\n", _pxCreatedTask);
+            //printf("*pxCreatedTask: %p\n", *_pxCreatedTask);
 
             // create edf metadata, and suspend task before it can be used
             taskENTER_CRITICAL();
@@ -1938,7 +1938,7 @@ static void prvAddNewTaskToReadyList( TCB_t * pxNewTCB ) PRIVILEGED_FUNCTION;
 
         BaseType_t xTaskCreateJobCBS( TaskFunction_t pxJobCode, void *arg, UBaseType_t indexCBS)
         {
-            printf("after *arg: %lu, indexCBS: %lu\n", *(BaseType_t*)arg, indexCBS);
+            //printf("after *arg: %lu, indexCBS: %lu\n", *(BaseType_t*)arg, indexCBS);
             // enqueue job
             struct jobClosure closure =  MAKE_CLOSURE(pxJobCode, arg);
             BaseType_t xReturn = xQueueSendToBack( queueCBS[indexCBS], ( void * ) &closure, ( TickType_t ) 0 );
@@ -1959,17 +1959,19 @@ static void prvAddNewTaskToReadyList( TCB_t * pxNewTCB ) PRIVILEGED_FUNCTION;
                     
                    // Rule 1
                     gpio_set_mask( 1u << 28 );
+                    printf("Rule 1\n");
                     gpio_clr_mask( 1u << 28 );
                 }
                 else
                 {
                     // Rule 2
                     gpio_set_mask( 1u << 2 );
+                    printf("Rule 2\n");
                     gpio_clr_mask( 1u << 2 );
                 }
             }
 
-            printf("after *arg: %lu, indexCBS: %lu\n", *(BaseType_t*)arg, indexCBS);
+            //printf("after *arg: %lu, indexCBS: %lu\n", *(BaseType_t*)arg, indexCBS);
 
             return xReturn;
         }
@@ -2074,7 +2076,7 @@ static void createEDF(  TaskHandle_t * pxCreatedTask,
 
     // update minEDFIndex and maxEDFIndex
     minEDFIndex++;
-    printf("minEDFIndex: %d\n", minEDFIndex);
+    //printf("minEDFIndex: %d\n", minEDFIndex);
     while ((xEDFTaskList[minEDFIndex].task != NULL) && (minEDFIndex < configMAX_NUM_TASKS - 1)) {minEDFIndex++;}
     
     if (minEDFIndex > maxEDFIndex + 1)
@@ -2085,10 +2087,10 @@ static void createEDF(  TaskHandle_t * pxCreatedTask,
     vTaskUpdatePriorityEDF();
     taskEXIT_CRITICAL();
 
-    printf("minEDFIndex-1: %d\n", minEDFIndex-1);
-    printf("xEDFTaskList[minEDFIndex-1].deadline: %ld\n", xEDFTaskList[minEDFIndex-1].deadline);
-    printf("xEDFTaskList[minEDFIndex-1].period: %ld\n", xEDFTaskList[minEDFIndex-1].period);
-    printf("xEDFTaskList[minEDFIndex-1].task: %p\n", xEDFTaskList[minEDFIndex-1].task);
+    //printf("minEDFIndex-1: %d\n", minEDFIndex-1);
+    //printf("xEDFTaskList[minEDFIndex-1].deadline: %ld\n", xEDFTaskList[minEDFIndex-1].deadline);
+    //printf("xEDFTaskList[minEDFIndex-1].period: %ld\n", xEDFTaskList[minEDFIndex-1].period);
+    //printf("xEDFTaskList[minEDFIndex-1].task: %p\n", xEDFTaskList[minEDFIndex-1].task);
 } 
 #endif /*(configUSE_EDF == 1) */
 /*-----------------------------------------------------------*/
@@ -2762,9 +2764,9 @@ static void prvInitialiseNewTask( TaskFunction_t pxTaskCode,
                     {
                         xEDFTaskList[k].periodStartTime = (xEDFTaskList[k].periodStartTime + xEDFTaskList[k].period) % portMAX_DELAY;
                         xEDFTaskList[k].deadlineTime = (xEDFTaskList[k].periodStartTime + xEDFTaskList[k].deadline) % portMAX_DELAY;
-                        printf("Priority Update after setting nnew xEDFTaskList values\n");
+                        //printf("Priority Update after setting nnew xEDFTaskList values\n");
                         vTaskUpdatePriorityEDF();
-                        printf("After Priority Update after setting nnew xEDFTaskList values\n");
+                        //printf("After Priority Update after setting nnew xEDFTaskList values\n");
                         isEndingPeriod[k] = 0;
                         break;
                     }
@@ -3567,11 +3569,11 @@ static void prvInitialiseNewTask( TaskFunction_t pxTaskCode,
         }
         isUpdatingPriorityEDF = 1;
 
-        printf("\nvTaskUpdatePriorityEDF Begin\n");
+        //printf("\nvTaskUpdatePriorityEDF Begin\n");
         TickType_t currentTime = xTaskGetTickCount();
         TaskHandle_t highestPriorityTask = NULL;
         uint8_t numEDFAtMaxPriority = 0;
-        //printf("maxEDFIndex: %d\n", maxEDFIndex);
+        ////printf("maxEDFIndex: %d\n", maxEDFIndex);
         for (int k = 0; k <= maxEDFIndex; k++)
         {
             char option = 99;
@@ -3600,6 +3602,7 @@ static void prvInitialiseNewTask( TaskFunction_t pxTaskCode,
                     option = 1;
                     tempTimeToDeadline = 0; // deadline has passed
                     printf("\n\n ERROR CASE. Option: %d \n\n", (int)option);
+                    // TODO: only print ERROR if its a hard timing task
                 }
                 else
                 {
@@ -3631,7 +3634,7 @@ static void prvInitialiseNewTask( TaskFunction_t pxTaskCode,
                 }
 
             }
-            // printf("option: %d, shotestTimeToDeadline: %lu, k: %d, tempTimeToDeadline: %ld\n", 
+            // //printf("option: %d, shotestTimeToDeadline: %lu, k: %d, tempTimeToDeadline: %ld\n", 
             //         option, shotestTimeToDeadline, k, tempTimeToDeadline);
             if ((tempTimeToDeadline < shotestTimeToDeadline) ||
                 ((tempTimeToDeadline == shotestTimeToDeadline) && (status.task == currentHighestPirorityEDF)))
@@ -3660,7 +3663,7 @@ static void prvInitialiseNewTask( TaskFunction_t pxTaskCode,
             {
                 // previous edf priorities obey edf requirements
                 // set previous highest priority to idle
-                printf("set pxCurrentTCB priority to idle\n");
+                //printf("set pxCurrentTCB priority to idle\n");
                 vTaskPrioritySet(currentHighestPirorityEDF, tskIDLE_PRIORITY);
             }
             else if ((numEDFAtMaxPriority > 0) && (xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED))
@@ -3668,12 +3671,12 @@ static void prvInitialiseNewTask( TaskFunction_t pxTaskCode,
                 // previous edf priorities do not obey edf requirements
                 printf("\n\n ERROR CASE. numEDFAtMaxPriority: %u \n\n", numEDFAtMaxPriority);
             }
-            printf("set highestPriorityTask priority to max\n");
+            //printf("set highestPriorityTask priority to max\n");
             currentHighestPirorityEDF = highestPriorityTask;
             vTaskPrioritySet(currentHighestPirorityEDF, uxEDFPriority); 
         }
         printEDFState(highestPriorityTask);
-        printf("vTaskUpdatePriorityEDF End\n\n");
+        //printf("vTaskUpdatePriorityEDF End\n\n");
         isUpdatingPriorityEDF = 0;
         taskEXIT_CRITICAL();
     }
@@ -3733,7 +3736,7 @@ static void prvInitialiseNewTask( TaskFunction_t pxTaskCode,
         }
         isUpdatingPriorityEDF = 1;
 
-        printf("\nvTaskUpdatePriorityEDFISR Begin\n");
+        //printf("\nvTaskUpdatePriorityEDFISR Begin\n");
         TickType_t currentTime = (TickType_t) xTickCount;
         TaskHandle_t highestPriorityTask = NULL;
         uint8_t numEDFAtMaxPriority = 0;
@@ -3818,7 +3821,7 @@ static void prvInitialiseNewTask( TaskFunction_t pxTaskCode,
             {
                 // previous edf priorities obey edf requirements
                 // set previous highest priority to idle
-                printf("set pxCurrentTCB priority to idle\n");
+                //printf("set pxCurrentTCB priority to idle\n");
                 vTaskPrioritySetISR(currentHighestPirorityEDF, tskIDLE_PRIORITY);
             }
             else if ((numEDFAtMaxPriority > 0) && (xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED))
@@ -3826,12 +3829,12 @@ static void prvInitialiseNewTask( TaskFunction_t pxTaskCode,
                 // previous edf priorities do not obey edf requirements
                 printf("\n\n ERROR CASE. numEDFAtMaxPriority: %u \n\n", numEDFAtMaxPriority);
             }
-            printf("set highestPriorityTask priority to max\n");
+            //printf("set highestPriorityTask priority to max\n");
             currentHighestPirorityEDF = highestPriorityTask;
             vTaskPrioritySetISR(currentHighestPirorityEDF, uxEDFPriority); 
         }
         printEDFState(highestPriorityTask);
-        printf("vTaskUpdatePriorityEDFISR End\n\n");
+        //printf("vTaskUpdatePriorityEDFISR End\n\n");
         
         isUpdatingPriorityEDF = 0;
         taskEXIT_CRITICAL_FROM_ISR(interruptStatus);
@@ -5572,7 +5575,7 @@ BaseType_t xTaskIncrementTick( void )
 
             if (xCBSTaskList[indexCBS].cost == 0)
             {
-                printf("cost is zero\n");
+                //printf("cost is zero\n");
                 xCBSTaskList[indexCBS].cost = xCBSTaskList[indexCBS].maxBudget;
                 *(xCBSTaskList[indexCBS].deadlineTime) +=  xCBSTaskList[indexCBS].serverPeriod;
                 *(xCBSTaskList[indexCBS].periodStartTime) = xTaskGetTickCount();
@@ -5581,8 +5584,9 @@ BaseType_t xTaskIncrementTick( void )
 
                 // Rule 3
                 gpio_set_mask( 1u << 3 );
+                printf("Rule 3\n");
                 gpio_clr_mask( 1u << 3 );
-                printf("done cost is zero\n");
+                //printf("done cost is zero\n");
             }
         }
     #endif /* (configUSE_CBS == 1) */
@@ -9641,23 +9645,23 @@ char vTaskIsReadyList(List_t * const pxList)
 }
 
 #if (configUSE_EDF == 1)
-    static void printEDFState(TaskHandle_t highestPriorityTask)
+    static void printEDFState(__attribute__((unused)) TaskHandle_t highestPriorityTask)
     {
-        printf("\nEDF Status:\n");
-        printf("highestPriorityTask: %p\n", highestPriorityTask);
-        printf("Current time: %lu\n", xTaskGetTickCount());
+        //printf("\nEDF Status:\n");
+        //printf("highestPriorityTask: %p\n", highestPriorityTask);
+        //printf("Current time: %lu\n", xTaskGetTickCount());
         for (int k = 0; k <= maxEDFIndex; k++)
         {
             if (xEDFTaskList[k].task != NULL)
             {
-                printf("task: %p, period: %lu, deadline: %lu, deadlineTime: %lu, periodStartTime: %lu, priority: %lu, state: %d \n", 
-                        xEDFTaskList[k].task, (unsigned long)xEDFTaskList[k].period, 
-                        (unsigned long)xEDFTaskList[k].deadline, (unsigned long)xEDFTaskList[k].deadlineTime, 
-                        (unsigned long)xEDFTaskList[k].periodStartTime, (unsigned long)xEDFTaskList[k].task->uxPriority,
-                        (int)eTaskGetStateFromList(xEDFTaskList[k].task));
+                // printf("task: %p, period: %lu, deadline: %lu, deadlineTime: %lu, periodStartTime: %lu, priority: %lu, state: %d \n", 
+                //         xEDFTaskList[k].task, (unsigned long)xEDFTaskList[k].period, 
+                //         (unsigned long)xEDFTaskList[k].deadline, (unsigned long)xEDFTaskList[k].deadlineTime, 
+                //         (unsigned long)xEDFTaskList[k].periodStartTime, (unsigned long)xEDFTaskList[k].task->uxPriority,
+                //         (int)eTaskGetStateFromList(xEDFTaskList[k].task));
             }
         }
-        printf("\n");
+        //printf("\n");
     }
 #endif /* (configUSE_EDF == 1) */
 /*-----------------------------------------------------------*/
