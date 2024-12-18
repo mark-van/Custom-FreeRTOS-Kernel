@@ -1922,7 +1922,7 @@ static void prvAddNewTaskToReadyList( TCB_t * pxNewTCB ) PRIVILEGED_FUNCTION;
 
             // Create CBS task         
             BaseType_t xReturn = xTaskCreate(taskCBS, pcName, uxStackDepth, &serverIndexCBS[*indexCBS], tskIDLE_PRIORITY, _pxCreatedTask);
-            (*pxCreatedTask)->taskIsCBS = 1;
+            (*_pxCreatedTask)->taskIsCBS = 1;
             printf("TaskHandle_t * const pxCreatedTask: %p\n", _pxCreatedTask);
             printf("*pxCreatedTask: %p\n", *_pxCreatedTask);
 
@@ -1930,14 +1930,15 @@ static void prvAddNewTaskToReadyList( TCB_t * pxNewTCB ) PRIVILEGED_FUNCTION;
             taskENTER_CRITICAL();
             // Create metadata for CBS task
             createCBS(maxBudget, serverPeriod, *indexCBS);
-            createEDF(pxCreatedTask, 0, serverPeriod);
+            createEDF(_pxCreatedTask, 0, serverPeriod);
             taskEXIT_CRITICAL();
 
             return xReturn;
         }
 
-        BaseType_t xTaskCreateJobCBS( __attribute__((unused))TaskFunction_t pxJobCode, __attribute__((unused))void *arg, __attribute__((unused))UBaseType_t indexCBS)
+        BaseType_t xTaskCreateJobCBS( TaskFunction_t pxJobCode, void *arg, UBaseType_t indexCBS)
         {
+            printf("after *arg: %lu, indexCBS: %lu\n", *(BaseType_t*)arg, indexCBS);
             // enqueue job
             struct jobClosure closure =  MAKE_CLOSURE(pxJobCode, arg);
             BaseType_t xReturn = xQueueSendToBack( queueCBS[indexCBS], ( void * ) &closure, ( TickType_t ) 0 );
@@ -1957,6 +1958,8 @@ static void prvAddNewTaskToReadyList( TCB_t * pxNewTCB ) PRIVILEGED_FUNCTION;
                     vTaskUpdatePriorityEDF();
                 }
             }
+
+            printf("after *arg: %lu, indexCBS: %lu\n", *(BaseType_t*)arg, indexCBS);
 
             return xReturn;
         }
@@ -1983,7 +1986,7 @@ static void prvAddNewTaskToReadyList( TCB_t * pxNewTCB ) PRIVILEGED_FUNCTION;
             for(;;)
             {
                 BaseType_t err;
-                err = xQueueReceive(queueCBS[*((int8_t*)pvParameters)], &(receive), portMAX_DELAY);
+                err = xQueueReceive(queueCBS[*((UBaseType_t*)pvParameters)], &(receive), portMAX_DELAY);
 
                 if(err != pdPASS)
                 {
@@ -3537,6 +3540,11 @@ static void prvInitialiseNewTask( TaskFunction_t pxTaskCode,
 #if ( (INCLUDE_vTaskPrioritySet == 1) && (configUSE_EDF == 1) )
     void vTaskUpdatePriorityEDF( void )
     {
+        if (xTaskGetSchedulerState() == taskSCHEDULER_NOT_STARTED)
+        {
+            return;
+        }
+
         // find task with highest priority, set the rest to the same low priority
         TickType_t shotestTimeToDeadline = portMAX_DELAY; // set to largest possible TickType_T value
         TickType_t tempTimeToDeadline;
@@ -3698,6 +3706,11 @@ static void prvInitialiseNewTask( TaskFunction_t pxTaskCode,
 #if ( (INCLUDE_vTaskPrioritySet == 1) && (configUSE_EDF == 1) )
     void vTaskUpdatePriorityEDFISR( void )
     {
+        if (xTaskGetSchedulerState() == taskSCHEDULER_NOT_STARTED)
+        {
+            return;
+        }
+
         // find task with highest priority, set the rest to the same low priority
         TickType_t shotestTimeToDeadline = portMAX_DELAY; // set to largest possible TickType_T value
         TickType_t tempTimeToDeadline;
@@ -4597,6 +4610,10 @@ void vTaskStartScheduler( void )
     /* OpenOCD makes use of uxTopUsedPriority for thread debugging. Prevent uxTopUsedPriority
      * from getting optimized out as it is no longer used by the kernel. */
     ( void ) uxTopUsedPriority;
+
+    #if ( configUSE_EDF == 1 )
+        vTaskUpdatePriorityEDF();
+    #endif
 
     traceRETURN_vTaskStartScheduler();
 }

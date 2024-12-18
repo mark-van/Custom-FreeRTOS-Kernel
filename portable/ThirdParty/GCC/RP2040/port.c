@@ -36,6 +36,7 @@
 #include "rp2040_config.h"
 #include "hardware/clocks.h"
 #include "hardware/exception.h"
+#include <stdio.h>
 
 /*
  * LIB_PICO_MULTICORE == 1, if we are linked with pico_multicore (note that
@@ -484,6 +485,7 @@ void vPortYield( void )
 #if ( configNUMBER_OF_CORES == 1 )
     void vPortExitCritical( void )
     {
+        //printf("uxCriticalNesting: %lu\n", uxCriticalNesting);
         configASSERT( uxCriticalNesting );
         uxCriticalNesting--;
 
