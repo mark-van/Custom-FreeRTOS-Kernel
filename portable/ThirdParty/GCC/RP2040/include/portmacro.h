@@ -211,20 +211,12 @@ extern void vPortEnableInterrupts();
             {                                                       \
                 gpio_clr_mask( (uint32_t)pxCurrentTCB->pxTaskTag ); \
             }                                                       \
-            else                                                    \
-            {                                                       \
-                gpio_clr_mask( (uint32_t)(1u << 2) );               \
-            }                                                       \
         } while( 0 )                                                
     #define traceTASK_SWITCHED_IN()                                 \
         do {                                                        \
             if( pxCurrentTCB->pxTaskTag != NULL )                   \
             {                                                       \
                 gpio_set_mask( (uint32_t)pxCurrentTCB->pxTaskTag ); \
-            }                                                       \
-            else                                                    \
-            {                                                       \
-                gpio_set_mask( (uint32_t)(1u << 2) );               \
             }                                                       \
         } while( 0 )                                                
 #endif /* if ( configUSE_APPLICATION_TASK_TAG == 1 ) */
